@@ -253,9 +253,9 @@ class DetectorCfgPPO( LeggedRobotCfgPPO ):
         max_iterations = 25000 # number of policy updates
         run_name = ''
         experiment_name = 'detector'
-        save_interval = 400
+        save_interval = 200
         
-        load_run='/home/yikai/Fall_Recovery_control/logs/detector/Aug03_07-14-40_'
+        load_run='/home/yikai/Fall_Recovery_control/logs/detector/Aug03_23-00-32_'
         #checkpoint = 0
         resume = False#True
 

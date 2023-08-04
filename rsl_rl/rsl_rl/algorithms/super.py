@@ -196,7 +196,8 @@ class SUPER:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                loss = (actions_batch-critic_obs_batch).pow(2)
+                detector_batch=self.actor_critic.actor(obs_batch)
+                loss = (detector_batch-critic_obs_batch).pow(2).mean()
 
                 # Gradient step
                 self.optimizer.zero_grad()

@@ -160,7 +160,7 @@ class Go1Detector(BaseTask):
         self.fall_buf=self.fall_buf.logical_or((fall_cri_history[:,self.height_ids]<0.5).all(dim=1))
         #print("******height:*******:",fall_cri_history[:,self.height_ids])
         self.fall_buf=self.fall_buf.logical_and(self.episode_length_buf>110)
-        print('**********fall***********:',self.fall_buf)
+        #print('**********fall***********:',self.fall_buf)
         fall_flag_ids=self.fall_buf.nonzero(as_tuple=False).flatten()
         self.fall_flag_queue.reset(fall_flag_ids,torch.ones(len(fall_flag_ids),1, device=self.device))
         
@@ -317,7 +317,7 @@ class Go1Detector(BaseTask):
         for i in range(len(self.reward_functions)):
             name = self.reward_names[i]
             rew = self.reward_functions[i]() * self.reward_scales[name]
-            print('*****rew_buf_shape******:',self.rew_buf.shape)
+            
             self.rew_buf += rew
             self.episode_sums[name] += rew
         if self.cfg.rewards.only_positive_rewards:
@@ -368,7 +368,7 @@ class Go1Detector(BaseTask):
         
         self.fall_cri_buf=torch.cat((self.root_states[:,2].unsqueeze(1),self.v_forward[:,2].unsqueeze(1)),dim=1)
         fall_flag=self.fall_flag_queue.get_obs_vec(np.arange(10))
-        print('**********fall_flag**********:',fall_flag.shape)
+        #print('**********fall_flag**********:',fall_flag.shape)
         self.privileged_obs_buf=fall_flag[:,0].unsqueeze(1)
        
 
@@ -1389,8 +1389,8 @@ class Go1Detector(BaseTask):
     
     def _reward_dof_pos(self):
         
-        print('***********v_for**********:',self.v_forward[:,2])
-        print('*******height*********',self.root_states[:,2])
+        #print('***********v_for**********:',self.v_forward[:,2])
+        #print('*******height*********',self.root_states[:,2])
         reward_forward=1-torch.clip(torch.sum(torch.square(self.dof_pos-self.front_dof),dim=1)/20,min=0.,max=1.)
         reward_back=1-torch.clip(torch.sum(torch.square(self.dof_pos-self.back_dof),dim=1)/20,min=0.,max=1.)
         reward_stand=1-torch.clip(torch.sum(torch.square(self.dof_pos-self.stand_dof),dim=1)/20,min=0.,max=1.)
@@ -1468,8 +1468,10 @@ class Go1Detector(BaseTask):
     
     def _reward_loss_fall_detect(self):
         fall_flag=self.fall_flag_queue.get_obs_vec(np.arange(10))
-        reward= torch.square(self.fall_detector-fall_flag[:,0]).squeeze(-1)
-        print('********rewardloss_fall_detect********',reward.shape)
+        #print('********fall_flag********',fall_flag.shape)
+        #print('********fall_detector********',self.fall_detector.shape)
+        reward= torch.square(self.fall_detector.squeeze(-1)-fall_flag[:,0])
+        #print('********rewardloss_fall_detect********',reward.shape)
         return reward
     
         
