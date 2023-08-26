@@ -35,7 +35,7 @@ import torch.optim as optim
 from rsl_rl.modules import ActorCritic
 from rsl_rl.storage import RolloutStorage
 
-class SUPER:
+class VALUE:
     actor_critic: ActorCritic
     def __init__(self,
                  actor_critic,
@@ -94,7 +94,7 @@ class SUPER:
             self.transition.hidden_states = self.actor_critic.get_hidden_states()
         # Compute the actions and values
         self.transition.actions = self.actor_critic.act(obs).detach()
-        self.transition.values = self.actor_critic.evaluate(critic_obs).detach()
+        self.transition.values = self.actor_critic.evaluate_sample(critic_obs).detach()
         self.transition.actions_log_prob = self.actor_critic.get_actions_log_prob(self.transition.actions).detach()
         self.transition.action_mean = self.actor_critic.action_mean.detach()
         self.transition.action_sigma = self.actor_critic.action_std.detach()
@@ -144,7 +144,7 @@ class SUPER:
     
     def compute_returns(self, last_critic_obs):
         last_values= self.actor_critic.evaluate(last_critic_obs).detach()
-        self.storage.compute_returns(last_values, self.gamma, self.lam)
+        self.storage.compute_returns_value(last_values, self.gamma, self.lam)
 
     def update(self):
         mean_value_loss = 0
@@ -191,18 +191,20 @@ class SUPER:
                 if self.use_clipped_value_loss:
                     value_clipped = target_values_batch + (value_batch - target_values_batch).clamp(-self.clip_param,
                                                                                                     self.clip_param)
-                    value_losses = (value_batch - returns_batch).pow(2)
+                    value_losses = (value_batch - 1/returns_batch).pow(2)
                     value_losses_clipped = (value_clipped - returns_batch).pow(2)
                     value_loss = torch.max(value_losses, value_losses_clipped).mean()
                 else:
-                    value_loss = (returns_batch - value_batch).pow(2).mean()
+                    value_loss = (1/returns_batch - value_batch).pow(2).mean()
 
-                detector_batch=self.actor_critic.actor(obs_batch)
+                #detector_batch=self.actor_critic.actor(obs_batch)
                 # print('detector_batch.shape',detector_batch.shape)
                 # print('critic_obs_batch.shape',critic_obs_batch.shape)
                 #deviation=torch.where(critic_obs_batch>0.9,2*(detector_batch-critic_obs_batch),detector_batch-critic_obs_batch)
-                loss = self.loss_func(detector_batch,critic_obs_batch)
-                surrogate_loss=loss
+                # print('returns_batch:',returns_batch)
+                # print('value_batch:',value_batch)
+                loss = value_loss
+                #surrogate_loss=loss
                 
 
                 # Gradient step

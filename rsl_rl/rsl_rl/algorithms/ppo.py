@@ -185,6 +185,21 @@ class PPO:
                 surrogate_clipped = -torch.squeeze(advantages_batch) * torch.clamp(ratio, 1.0 - self.clip_param,
                                                                                 1.0 + self.clip_param)
                 surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
+                
+                target_mode_batch=torch.logical_or(critic_obs_batch[:,0], critic_obs_batch[:,2])
+                target_mode_batch=target_mode_batch.to(torch.int64)
+                target_one_hot = torch.zeros(6*self.num_envs, 2, device=self.device)
+                target_one_hot.scatter_(1, torch.tensor(target_mode_batch).unsqueeze(1), 1)
+                target_batch=torch.cat((target_one_hot, (critic_obs_batch)[:,3].unsqueeze(1)), dim=1)
+                
+                #print('target_batch',target_batch[0])
+                
+                raw_actions_batch=self.actor_critic.actor(obs_batch)
+                mode_batch=nn.functional.softmax(raw_actions_batch[:,:2], dim=-1)
+                mode_loss=torch.square(mode_batch-target_batch[:,:2]).mean()
+                #mode_loss=torch.square(raw_actions_batch-target_one_hot).mean()
+                #print('mode_loss',mode_batch[0])
+                height_loss=torch.square(raw_actions_batch[:,2]-target_batch[:,2]).mean()
 
                 # Value function loss
                 if self.use_clipped_value_loss:
@@ -196,7 +211,8 @@ class PPO:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
+                #loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
+                loss=mode_loss+height_loss#-self.entropy_coef * entropy_batch.mean()#+height_loss
 
                 # Gradient step
                 self.optimizer.zero_grad()
@@ -204,8 +220,10 @@ class PPO:
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 
-                mean_value_loss += value_loss.item()
-                mean_surrogate_loss += surrogate_loss.item()
+                #mean_value_loss += value_loss.item()
+                # mean_surrogate_loss += surrogate_loss.item()
+                mean_value_loss += height_loss.item()
+                mean_surrogate_loss += mode_loss.item()
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_value_loss /= num_updates
@@ -213,3 +231,4 @@ class PPO:
         self.storage.clear()
 
         return mean_value_loss, mean_surrogate_loss
+

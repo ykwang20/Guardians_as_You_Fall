@@ -65,7 +65,7 @@ class ActorCritic_Selector(nn.Module):
             else:
                 actor_layers.append(nn.Linear(actor_hidden_dims[l], actor_hidden_dims[l + 1]))
                 actor_layers.append(activation)
-        actor_layers.append(nn.Softmax(dim=-1))
+        #actor_layers.append(nn.Softmax(dim=-1))
         self.actor = nn.Sequential(*actor_layers)
 
         # Value function
@@ -122,25 +122,31 @@ class ActorCritic_Selector(nn.Module):
 
     def update_distribution(self, observations):
         mean = self.actor(observations)
-        #print("mean", mean)
-        #std = self.std.to(mean.device)
+        softmax_output = nn.functional.softmax(mean[:, :2], dim=-1)
+        mean=torch.cat((softmax_output, mean[:, 2].unsqueeze(1)), dim=-1)
+        #print("mean", mean)                    
         #print("std:",std)
         # zeros =torch.zeros_like(mean) 
-        # std = self.std.to(mean.device)
+        #std = (self.std.to(mean.device))/5
+        std=torch.cat((0.2*torch.ones_like(softmax_output),0.01*torch.ones_like(mean[:, 2].unsqueeze(1))), dim=-1)
         # mean=(mean + Normal(zeros, std).sample()).clip(min=0.001,max=1)
         #mean[:,:]=mean[:,:]/torch.sum(mean[:,:],dim=1).unsqueeze(1)
-        self.distribution = OneHotCategorical(mean)
+        #self.distribution = OneHotCategorical(mean)
+        self.distribution = Normal(mean, std)
 
     def act(self, observations, **kwargs):
         self.update_distribution(observations)
         return self.distribution.sample()
+        #return self.actor(observations)
     
     def get_actions_log_prob(self, actions):
         return self.distribution.log_prob(actions).sum(dim=-1)
 
     def act_inference(self, observations):
         actions_mean = self.actor(observations)
-        return actions_mean
+        softmax_output = nn.functional.softmax(actions_mean[:, :2], dim=-1)
+        actions=torch.cat((softmax_output, actions_mean[:, 2].unsqueeze(1)), dim=-1)
+        return actions
 
     def evaluate(self, critic_observations, **kwargs):
         value = self.critic(critic_observations)

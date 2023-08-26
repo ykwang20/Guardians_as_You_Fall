@@ -30,71 +30,46 @@
 
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
-class Go1StandCfg( LeggedRobotCfg ):
+class BallCfg( LeggedRobotCfg ):
 
     class env( LeggedRobotCfg.env ):
         num_envs = 5480
+        num_modes=3#5
         include_history_steps = 3  # Number of steps of history to include.#3 for stand
-        num_observations =46#42#39#43#46#48 #for stand#42
-        num_privileged_obs = 49#45#49#48
-        episode_length_s =4
+        num_observations =46#46#42#48 #for stand#42
+        num_privileged_obs = 66#72#66#48#48
+        num_selector_obs =467# 466
+        episode_length_s =5#20
         reference_state_initialization = False
         # reference_state_initialization_prob = 0.85
         # amp_motion_files = MOTION_FILES
 
     class init_state( LeggedRobotCfg.init_state ):
+        #pos = [0.0, 0.0, 0.55] # x,y,z [m]
         pos = [0.0, 0.0, 0.268] # x,y,z [m]
-        rot = [0., -1.0, 0.0, 0.0] # x,y,z,w [quat]
-        #rot = [0., 0., 0.0, 1.0] # x,y,z,w [quat]
-        default_joint_angles = { # = target angles [rad] when action = 0.0
+        #rot = [0.0, -0.707107, 0.0, 0.707107] # x,y,z,w [quat]
+        rot = [0., 0.0, 0.0, 1.0] # x,y,z,w [quat]
+        desired_pos = [0.0, 0.0, 0.267] # x,y,z [m]
+        ball_pos=[0.,0.,0.63]
+        ball_lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
+        ball_ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
+        stand_joint_angles = { # = target angles [rad] when action = 0.0
             '2_FL_hip_joint': 0.,   # [rad]
             '4_RL_hip_joint': 0.,   # [rad]
             '1_FR_hip_joint': 0. ,  # [rad]
             '3_RR_hip_joint': 0.,   # [rad]
 
-            '2_FL_thigh_joint': 0.9,     # [rad]
-            '4_RL_thigh_joint': 0.9,   # [rad]
-            '1_FR_thigh_joint': 0.9,     # [rad]
-            '3_RR_thigh_joint': 0.9,   # [rad]
+            '2_FL_thigh_joint': 1.3,     # [rad]
+            '4_RL_thigh_joint': 2.2,   # [rad]
+            '1_FR_thigh_joint': 1.3,     # [rad]
+            '3_RR_thigh_joint': 2.2,   # [rad]
 
-            '2_FL_calf_joint': -1.8,   # [rad]
-            '4_RL_calf_joint': -1.8,    # [rad]
-            '1_FR_calf_joint': -1.8,  # [rad]
-            '3_RR_calf_joint': -1.8,    # [rad]
+            '2_FL_calf_joint': -2.2,   # [rad]
+            '4_RL_calf_joint': -1.0,    # [rad]
+            '1_FR_calf_joint': -2.2,  # [rad]
+            '3_RR_calf_joint': -1.0,    # [rad]
         }
-        # default_joint_angles={
-        #     '2_FL_hip_joint': 0.,   # [rad]
-        #     '4_RL_hip_joint': 0.,   # [rad]
-        #     '1_FR_hip_joint': 0. ,  # [rad]
-        #     '3_RR_hip_joint': 0.,   # [rad]
-
-        #     '2_FL_thigh_joint': 1.3,     # [rad]
-        #     '4_RL_thigh_joint': 2.2,   # [rad]
-        #     '1_FR_thigh_joint': 1.3,     # [rad]
-        #     '3_RR_thigh_joint': 2.2,   # [rad]
-
-        #     '2_FL_calf_joint': -2.2,   # [rad]
-        #     '4_RL_calf_joint': -1.0,    # [rad]
-        #     '1_FR_calf_joint': -2.2,  # [rad]
-        #     '3_RR_calf_joint': -1.0,    # [rad]
-        # }
-        # init_joint_angles = { # = target angles [rad] when action = 0.0
-        #     '2_FL_hip_joint': 0.,   # [rad]
-        #     '4_RL_hip_joint': 0.,   # [rad]
-        #     '1_FR_hip_joint': 0. ,  # [rad]
-        #     '3_RR_hip_joint': 0.,   # [rad]
-
-        #     '2_FL_thigh_joint': 0.9,     # [rad]
-        #     '4_RL_thigh_joint': 0.9,   # [rad]
-        #     '1_FR_thigh_joint': 0.9,     # [rad]
-        #     '3_RR_thigh_joint': 0.9,   # [rad]
-
-        #     '2_FL_calf_joint': -1.8,   # [rad]
-        #     '4_RL_calf_joint': -1.8,    # [rad]
-        #     '1_FR_calf_joint': -1.8,  # [rad]
-        #     '3_RR_calf_joint': -1.8,    # [rad]
-        # }
-        init_joint_angles={
+        back_joint_angles={
             '2_FL_hip_joint': 0.,   # [rad]
             '4_RL_hip_joint': 0.,   # [rad]
             '1_FR_hip_joint': 0. ,  # [rad]
@@ -110,9 +85,42 @@ class Go1StandCfg( LeggedRobotCfg ):
             '1_FR_calf_joint': -1.8,  # [rad]
             '3_RR_calf_joint': -1.8,    # [rad]
         }
+        avg_joint_angles={
+            '2_FL_hip_joint': 0.,   # [rad]
+            '4_RL_hip_joint': 0.,   # [rad]
+            '1_FR_hip_joint': 0. ,  # [rad]
+            '3_RR_hip_joint': 0.,   # [rad]
+
+            '2_FL_thigh_joint': 2.4708,     # [rad]
+            '4_RL_thigh_joint': 2.4708,   # [rad]
+            '1_FR_thigh_joint': 2.4708,     # [rad]
+            '3_RR_thigh_joint': 2.4708,   # [rad]
+
+            '2_FL_calf_joint': -1.8,   # [rad]
+            '4_RL_calf_joint': -1.8,    # [rad]
+            '1_FR_calf_joint': -1.8,  # [rad]
+            '3_RR_calf_joint': -1.8,    # [rad]
+        }
+        front_joint_angles = { # = target angles [rad] when action = 0.0
+            '2_FL_hip_joint': 0.,   # [rad]
+            '4_RL_hip_joint': 0.,   # [rad]
+            '1_FR_hip_joint': 0. ,  # [rad]
+            '3_RR_hip_joint': 0.,   # [rad]
+
+            '2_FL_thigh_joint': 0.9,     # [rad]
+            '4_RL_thigh_joint': 0.9,   # [rad]
+            '1_FR_thigh_joint': 0.9,     # [rad]
+            '3_RR_thigh_joint': 0.9,   # [rad]
+
+            '2_FL_calf_joint': -1.8,   # [rad]
+            '4_RL_calf_joint': -1.8,    # [rad]
+            '1_FR_calf_joint': -1.8,  # [rad]
+            '3_RR_calf_joint': -1.8,    # [rad]
+        }
     
     class noise:
-        add_noise = True#False
+        #TODO: add noise to the only to the observation, not privileged observation
+        add_noise = True
         noise_level = 1.0 # scales other values
         class noise_scales:
             dof_pos = 0.01
@@ -122,11 +130,11 @@ class Go1StandCfg( LeggedRobotCfg ):
             gravity = 0.05
             height_measurements = 0.1
             
-    class commands:
+    class commands:# no command for stand
         curriculum = False
         max_curriculum = 1.
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
-        resampling_time = 10. # time before command are changed[s]
+        resampling_time = 9. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
         goal=[5,0]
         class ranges:
@@ -148,42 +156,46 @@ class Go1StandCfg( LeggedRobotCfg ):
     class sim(LeggedRobotCfg.sim):
         dt =  0.005
     
-    class normalization(LeggedRobotCfg.normalization):
-        #clip_actions_hi=[0.6,1.2,1.2]#[2.4,4.8,4.8]# # [hip, thigh, calf]
-        clip_actions_hi=[0.6,3.6,1.2]#[2.4,4.8,4.8]# for back_stand
-        clip_actions_lo=[-0.6,-1.2,-1.2]#
+    #class normalization(LeggedRobotCfg.normalization):
+        #clip_actions=[0.6,1.2,1.2]#[2.4,4.8,4.8]# # [hip, thigh, calf]
         
     class domain_rand(LeggedRobotCfg.terrain):
         randomize_friction = True
-        friction_range =[0.5, 2] #[0.5, 1.25]
-        randomize_base_mass =True# False
+        friction_range = [0.5, 1.25]
+        randomize_base_mass = True
         added_mass_range = [-1., 1.]
         push_robots = True
-        push_interval_s = 3#15
-        max_push_vel_xy = 1.
-        randomize_gains = True#False
+        push_interval_s = 1#15
+        max_push_vel_xy = 2.
+        max_push_ang=4.
+        randomize_gains = True
         stiffness_multiplier_range = [0.9, 1.1]
         damping_multiplier_range = [0.9, 1.1]
+        
+    class normalization(LeggedRobotCfg.normalization):
+        clip_actions=[0.6,1.2,1.2]#[2.4,4.8,4.8]# # [hip, thigh, calf]
     
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
         control_type = 'P'
-        stiffness ={'joint': 20.}# {'joint': 60.}  # [N*m/rad]
-        damping = {'joint': 0.5}#{'joint': 3.}     # [N*m*s/rad]
+        stiffness ={'joint': 20.} #{'joint': 60.}  # [N*m/rad]
+        damping ={'joint': 0.5} #{'joint': 3.}     # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 1# for stand#0.25
         # decimation: Number of control action updates @ sim DT per policy DT
-        decimation = 4
+        decimation = 4#10#4
 
     class asset( LeggedRobotCfg.asset ):
         file = '/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/go1/urdf/go1.urdf'
         ball_file= '/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/ball.urdf'
-        num_balls_row=0#3
-        num_balls_col=0#3
+        num_balls_row=1
+        num_balls_col=1
+        
         foot_name = "foot"
-        penalize_contacts_on = ["thigh", "calf"]
-        terminate_after_contacts_on = [ "base","RL_hip","RR_hip"]
+        rear_foot_names=["RL_foot","RR_foot"]
+        penalize_contacts_on = ["base","hip","thigh", "calf"]
         #terminate_after_contacts_on = [ "base"]
+        terminate_after_contacts_on = [ ]
         self_collisions = 0 # 1 to disable, 0 to enable...bitwise filter
   
     class rewards( LeggedRobotCfg.rewards ):
@@ -196,44 +208,59 @@ class Go1StandCfg( LeggedRobotCfg ):
             lin_vel_z =0# -1
             ang_vel_xy = 0.0
             orientation = 0.0
-            torques =0#-0.00001# -0.00005
-            dof_vel =0# -0.15 #for stand
-            dof_acc =-5e-8# -1e-7#-2.5e-7
+            torques = -0.00001#-4e-7#-1e-5#-4e-7 #-0.00005 for stand
+            dof_vel =0#-0.15 #for stand
+            dof_acc =-1e-8#-2.5e-8#-2.5e-7 #for stand
             base_height = 0.0 
             feet_air_time =  0.0
-            collision = 0.0
             feet_stumble = 0.0 
-            action_rate_exp =0#3 #for stand
-            action_rate=-2.5e-3     #TODO: check if this is the right value actions_before? actions out of bound?
-            hip_pos=-0.01#-0.1
+            action_rate_exp =0  #0.3for stand
+            action_rate=-5e-3#-2.5e-3#-5e-4#-0.005for stand
+            hip_pos=0#-0.1
             stand_still = 0.0
             dof_pos_limits = 0.0
-            upright=1.0 #for stand
-            max_height=1. #for stand
+            upright=0 #1.0 for stand
+            max_height=0 #1.0for stand
             work=0#-0.003
             traj_tracking=0#2
             regularization=0#-0.5
             regular_pose=0#-0.5
             pursue_goal=0#1
             hang=0#-2
-            front_legs=0#-1
-            action_limit=-2
+            body_orientation=1#1
+            body_height=2
+            dof_pos=2      
+            foot_height=1#0.5#1
+            action=0#-1e-3
+            recovery=0#100
+            collision=0#-5e-5#-5e-4#-1e-5#-5e-4#-0.001#-5e-4
+            net_force=0#-5e-5#-5e-4
+            yank=0#-1.25e-6#-1.25e-5#-1.25e-4#-1.25e-5
+            high_cmd=0#1
+            stand=0#4.6
+            crouch=0#1.1
             
-        only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
+        only_positive_rewards = False#True # if true negative total rewards are clipped at zero (avoids early termination problems)
 
-class Go1StandCfgPPO( LeggedRobotCfgPPO ):
+class BallCfgPPO( LeggedRobotCfgPPO ):
+    seed=23
+    runner_class_name = 'OnPolicyRunnerBall'
     class policy( LeggedRobotCfgPPO.policy ):
         init_noise_std = 1.0
         load_std=True
+        actor_hidden_dims = [512,256,128]
+        critic_hidden_dims = [512,256,128]
     class algorithm( LeggedRobotCfgPPO.algorithm ):
         entropy_coef = 0.01
     class runner( LeggedRobotCfgPPO.runner ):
-        max_iterations = 5000 # number of policy updates
+        policy_class_name = 'ActorCritic'
+        max_iterations = 25000 # number of policy updates
         run_name = ''
-        experiment_name = 'back_stand'
-        save_interval = 400
-        load_run='/home/yikai/Fall_Recovery_control/logs/back_stand/Aug21_14-43-43_'
-        #checkpoint=600
-        resume =False#True
+        experiment_name = 'ball'
+        save_interval = 200
+        load_stand_policy='/home/yikai/AMP_for_hardware/logs/go1_stand/Jul18_08-29-52_/model_300.pt'
+        load_run='/home/yikai/Fall_Recovery_control/logs/ball/Aug21_10-23-23_'
+        #checkpoint = 400
+        resume = False#True
 
   

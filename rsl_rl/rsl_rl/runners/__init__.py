@@ -31,3 +31,4 @@
 from .on_policy_runner import OnPolicyRunner
 from .on_policy_runner_selector import OnPolicyRunnerSelector
 from .on_policy_runner_detector import OnPolicyRunnerDetector
+from .on_policy_runner_ball import OnPolicyRunnerBall

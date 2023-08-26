@@ -250,13 +250,13 @@ class DetectorCfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         algorithm_class_name = 'SUPER'
         policy_class_name = 'ActorCritic_Detector'
-        max_iterations = 25000 # number of policy updates
+        max_iterations = 5000 # number of policy updates
         run_name = ''
         experiment_name = 'detector'
-        save_interval = 200
+        save_interval = 400
         
-        load_run='/home/yikai/Fall_Recovery_control/logs/detector/Aug03_23-00-32_'
-        #checkpoint = 0
+        load_run='/home/yikai/Fall_Recovery_control/logs/detector/Aug06_15-50-41_'
+        checkpoint = 400
         resume = False#True
 
   

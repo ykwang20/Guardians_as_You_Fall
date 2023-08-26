@@ -29,6 +29,8 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 from isaacgym import gymapi
 from legged_gym import LEGGED_GYM_ROOT_DIR
+from isaacgym.torch_utils import *
+
 import os
 import copy
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
@@ -45,7 +47,7 @@ def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     
     # override some parameters for testing
-    env_cfg.env.num_envs =min(env_cfg.env.num_envs, 1)
+    env_cfg.env.num_envs =min(env_cfg.env.num_envs, 200)
     #env_cfg.terrain.num_rows = 20
     #env_cfg.terrain.num_cols = 20
     env_cfg.terrain.mesh_type='plane'
@@ -68,7 +70,7 @@ def play(args):
         path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'policies')
 
         os.makedirs(path, exist_ok=True)
-        path_actor = os.path.join(path, 'fall_policy.pt')
+        path_actor = os.path.join(path, '.pt')
         model = copy.deepcopy(ppo_runner.alg.actor_critic.actor).to('cpu')
         traced_script_module = torch.jit.script(model)
         traced_script_module.save(path_actor)
@@ -103,6 +105,10 @@ def play(args):
         gymapi.FOLLOW_POSITION)
     path=os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'frames')
     #os.mkdir(path)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 1
+    font_color = (255, 0, 255)  
+    font_thickness = 2
 
     base_contact_forces=[]
     base_jerk=[]
@@ -114,20 +120,34 @@ def play(args):
     video=None
     img_idx=0
     low_filter=None
-    for i in range(int(4*env.max_episode_length)):
-        env.high_cmd[0,:]=0
+    for i in range(int(800)):
+        #rec_time=1/ppo_runner.estimator(obs[:,6:])
+        rec_time=torch.zeros((env_cfg.env.num_envs,1),device=env.device)
+        #obs=torch.cat((rec_time,obs),dim=1)
+        #env.high_cmd[0,:]=0
+        #print('rec time',rec_time)
         actions = policy(obs.detach())
-        mode=torch.argmax(actions, dim=1).unsqueeze(1)
-        mode[:,:]=0
-        print(mode)
+        #print('actions_before',actions)
+        #actions=ppo_runner.alg.act_high(obs, critic_obs)
+
+        #print('actions',actions)
+        mode=torch.argmax(actions[:,:2], dim=1).unsqueeze(1)
+        height=actions[:,2].unsqueeze(1)
+        # v_forward=quat_rotate(env.root_states[:, 3:7],env.forward_vec)
+        # condition=torch.logical_or(rec_time.squeeze()<0.4,torch.abs(v_forward[:,2]).squeeze()<0.3)
+        # mode=torch.where(condition,2*torch.ones_like(mode),mode)
+        #if i< 5:
+        #mode[0]=0
+        
+        print('mode:',mode[0])
         for _ in range(1):
-            low_actions=torch.where(mode==0, ppo_runner.front_stand_policy(obs[:,-3*env.num_obs:]),ppo_runner.zero_action)
-            low_actions+=torch.where(mode==1, ppo_runner.back_stand_policy(obs[:,-3*env.num_obs:]),ppo_runner.zero_action)
-            low_actions+=torch.where(mode==2, ppo_runner.fall_policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
+            low_actions=torch.where(mode==0, ppo_runner.front_stand_policy(obs[:,-3*env.num_obs:]+ppo_runner.front_offset),ppo_runner.zero_action)
+            low_actions+=torch.where(mode==2, ppo_runner.back_stand_policy(obs[:,-3*env.num_obs:]+ppo_runner.front_offset),ppo_runner.zero_action)
+            low_actions+=torch.where(mode==1, ppo_runner.fall_policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
             low_actions+=torch.where(mode==3, ppo_runner.back_front_policy(obs[:,-env.num_obs:]),ppo_runner.zero_action)
             low_actions+=torch.where(mode==4, ppo_runner.front_back_policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
             
-            obs, privileged_obs, rewards, dones, infos, _=env.step(low_actions,mode.squeeze(1))
+            obs, privileged_obs, rewards, dones, infos, _=env.step(low_actions,mode.squeeze(1),height)
         
         # base_contact_forces.append((torch.norm(env.contact_forces[:, 0, 2],dim=0)/env_cfg.env.num_envs).cpu().numpy())
         # base_vel.append((torch.norm(env.rigid_lin_vel[:, 0,:],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
@@ -148,6 +168,12 @@ def play(args):
             img = cv2.imread(filename)
             if video is None:
                 video = cv2.VideoWriter('new_dataset.mp4', cv2.VideoWriter_fourcc(*'MP4V'), int(1 / env.dt), (img.shape[1],img.shape[0]))
+            text = f'mode: {mode[0].cpu().numpy()}'
+            cv2.putText(img, text, (10, 500), font, font_scale, font_color, font_thickness)
+            text = f'Est CoT height : {height[0].squeeze().detach().cpu().numpy()}'
+            cv2.putText(img, text, (10, 400), font, font_scale, font_color, font_thickness)
+            text = f'High cmd : {env.high_cmd[0].squeeze().detach().cpu().numpy()}'
+            cv2.putText(img, text, (10, 300), font, font_scale, font_color, font_thickness)
             video.write(img)
             img_idx += 1 
             print(filename)

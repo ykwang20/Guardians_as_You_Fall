@@ -94,12 +94,13 @@ class Go1Stand(BaseTask):
         """ Reset all robots"""
         #self.foot_pos=self.foot_positions_in_base_frame(self.dof_pos).to(self.device)
         self.reset_idx(torch.arange(self.num_envs, device=self.device))
+        
         if self.cfg.env.include_history_steps is not None:
             self.obs_buf_history.reset(
                 torch.arange(self.num_envs, device=self.device),
                 self.obs_buf[torch.arange(self.num_envs, device=self.device)])
-        #obs, privileged_obs, _, _, _, _= self.step((self.init_dof_pos-self.default_dof_pos).repeat(self.num_envs,1))
-        obs, privileged_obs, _, _, _, _= self.step(torch.zeros_like(self.init_dof_pos).repeat(self.num_envs,1))
+        obs, privileged_obs, _, _, _, _= self.step((self.init_dof_pos-self.default_dof_pos).repeat(self.num_envs,1))
+        #obs, privileged_obs, _, _, _, _= self.step(torch.zeros_like(self.init_dof_pos).repeat(self.num_envs,1))
         return obs, privileged_obs
 
     def step(self, actions):
@@ -108,14 +109,13 @@ class Go1Stand(BaseTask):
         Args:
             actions (torch.Tensor): Tensor of shape (num_envs, num_actions_per_env)
         """
-        clip_actions = self.cfg.normalization.clip_actions
+        self.clip_actions = self.cfg.normalization.clip_actions
         self.actions_before=actions
-        self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
+        #self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
 
         #print('actions_before clip', actions)
-        # self.actions[:,[0,3,6,9]] = torch.clip(actions[:,[0,3,6,9]], -clip_actions[0], clip_actions[0]).to(self.device)
-        # self.actions[:,[1,4,7,10]] = torch.clip(actions[:,[1,4,7,10]], -clip_actions[1], clip_actions[1]).to(self.device)
-        # self.actions[:,[2,5,8,11]] = torch.clip(actions[:,[2,5,8,11]], -clip_actions[2], clip_actions[2]).to(self.device)
+        self.actions=actions.clip(min=self.action_limit_lo, max=self.action_limit_hi)
+        
         #print('actions_after clip', self.actions)
         # step physics and render each frame
         self.render()
@@ -166,8 +166,8 @@ class Go1Stand(BaseTask):
         self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
         self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
         self.projected_gravity[:] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
-        self.goal_disp=self.goal-(self.root_states[:,:2]-self.env_origins[:,:2])
-        self.goal_heading=self.goal_disp/torch.norm(self.goal_disp,dim=1,keepdim=True)
+        #self.goal_disp=self.goal-(self.root_states[:,:2]-self.env_origins[:,:2])
+        #self.goal_heading=self.goal_disp/torch.norm(self.goal_disp,dim=1,keepdim=True)
         #self.manip_commands[:,2]=torch.clip(self.dt/self.manip_commands[:,0]+self.manip_commands[:,2],0,1)
         #self.foot_pos = self.rigid_pos[:,self.feet_indices[0],:]
         
@@ -180,11 +180,13 @@ class Go1Stand(BaseTask):
         self._post_physics_step_callback()
 
         # compute observations, rewards, resets, ...
+        
         self.check_termination()
         self.compute_reward()
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
         #terminal_amp_states = self.get_amp_observations()[env_ids]
         self.reset_idx(env_ids)
+        
         self.compute_observations() # in some cases a simulation step might be required to refresh some obs (for example body positions)
 
         self.last_actions[:] = self.actions[:]
@@ -214,8 +216,10 @@ class Go1Stand(BaseTask):
         Args:
             env_ids (list[int]): List of environment ids which must be reset
         """
+        
         if len(env_ids) == 0:
             return
+        
         # update curriculum
         if self.cfg.terrain.curriculum:
             self._update_terrain_curriculum(env_ids)
@@ -262,6 +266,13 @@ class Go1Stand(BaseTask):
         # send timeout info to the algorithm
         if self.cfg.env.send_timeouts:
             self.extras["time_outs"] = self.time_out_buf
+        
+        # self.base_quat[env_ids] = self.root_states[env_ids, 3:7]
+        # self.base_lin_vel[env_ids] = quat_rotate_inverse(self.base_quat, self.root_states[env_ids, 7:10])
+        # self.base_ang_vel[env_ids] = quat_rotate_inverse(self.base_quat, self.root_states[env_ids, 10:13])
+        # self.projected_gravity[env_ids] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
+        
+        
     
     def compute_reward(self):
         """ Compute rewards
@@ -289,19 +300,11 @@ class Go1Stand(BaseTask):
                                     self.base_ang_vel  * self.obs_scales.ang_vel,
                                     self.projected_gravity,
                                     #self.commands[:, :3] * self.commands_scale,
-                                    #self.goal_heading,
-                                    #self.root_states[:,:2]-self.env_origins[:,:2],
                                     (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                     self.dof_vel * self.obs_scales.dof_vel,
                                     self.actions,
                                     self.contact_filt
-                                    #self.manip_commands[:,:3],
-                                    #(self.manip_commands[:,3]-self.manip_init_p[:,0]).unsqueeze(1),
-                                    #(self.manip_commands[:,4]-self.manip_init_p[:,1]).unsqueeze(1),
-                                    #(self.rigid_pos[:,self.feet_indices[0],0]-self.root_states[:,0]).unsqueeze(1),
-                                    #(self.rigid_pos[:,self.feet_indices[0],1]-self.root_states[:,1]).unsqueeze(1),
-                                    #self.rigid_pos[:,self.feet_indices[0],2].unsqueeze(1),
-                                    #(self.manip_commands[:,1]*torch.sin(math.pi*self.manip_commands[:,2])).unsqueeze(1)
+                                    
                                     ),dim=-1)
         #print(self.privileged_obs_buf.shape,"pri")
         # add perceptive inputs if not blind
@@ -309,11 +312,11 @@ class Go1Stand(BaseTask):
             heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements
             self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, heights), dim=-1)
 
+        self.obs_buf = self.privileged_obs_buf[:, -self.num_obs:]
         # add noise if needed
         if self.add_noise:
-            self.privileged_obs_buf += (2 * torch.rand_like(self.privileged_obs_buf) - 1) * self.noise_scale_vec
-
-        self.obs_buf = self.privileged_obs_buf[:, -self.num_obs:]
+            self.obs_buf += (2 * torch.rand_like(self.obs_buf) - 1) * self.noise_scale_vec
+        
 
     def get_amp_observations(self,amp_forward=["joint_pose","foot","joint_vel","z"]):
         joint_pos = self.dof_pos
@@ -518,13 +521,15 @@ class Go1Stand(BaseTask):
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        self.dof_pos[env_ids] = self.init_dof_pos #* torch_rand_float(0.5, 1.5, (len(env_ids), self.num_dof), device=self.device)
+        #print('prior dof state:',self.dof_state)
+        self.dof_pos[env_ids] = self.init_dof_pos * torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
         self.dof_vel[env_ids] = 0.
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_dof_state_tensor_indexed(self.sim,
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+        #print('post dof state:',self.dof_state)
 
     def _reset_dofs_amp(self, env_ids, frames):
         """ Resets DOF position and velocities of selected environmments
@@ -555,6 +560,7 @@ class Go1Stand(BaseTask):
             env_ids (List[int]): Environemnt ids
         """
         # base position
+        #print('prior root state:',self.root_states)
         if self.custom_origins:
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
@@ -569,6 +575,7 @@ class Go1Stand(BaseTask):
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self.all_root_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+        #print('post root state:',self.root_states)
 
     def _reset_root_states_amp(self, env_ids, frames):
         """ Resets ROOT states position and velocities of selected environmments
@@ -642,17 +649,17 @@ class Go1Stand(BaseTask):
         Returns:
             [torch.Tensor]: Vector of scales used to multiply a uniform distribution in [-1, 1]
         """
-        noise_vec = torch.zeros_like(self.privileged_obs_buf[0])
+        noise_vec = torch.zeros_like(self.obs_buf[0])
         self.add_noise = self.cfg.noise.add_noise
         noise_scales = self.cfg.noise.noise_scales
         noise_level = self.cfg.noise.noise_level
-        noise_vec[:3] = noise_scales.lin_vel * noise_level * self.obs_scales.lin_vel
-        noise_vec[3:6] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
-        noise_vec[6:9] = noise_scales.gravity * noise_level
-        noise_vec[9:12] = 0. # commands
-        noise_vec[12:int(12+self.cfg.env.num_actions)] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
-        noise_vec[int(12+self.cfg.env.num_actions):int(12+self.cfg.env.num_actions*2)] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
-        noise_vec[int(12+self.cfg.env.num_actions*2):int(12+self.cfg.env.num_actions*3)] = 0. # previous actions
+        noise_vec[:3] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
+        #noise_vec[3:6] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
+        noise_vec[3:6] = noise_scales.gravity * noise_level
+        #noise_vec[9:12] = 0. # commands
+        noise_vec[6:int(6+self.cfg.env.num_actions)] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
+        noise_vec[int(6+self.cfg.env.num_actions):int(6+self.cfg.env.num_actions*2)] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
+        noise_vec[int(6+self.cfg.env.num_actions*2):] = 0. # previous actions & contact filt
         if self.cfg.terrain.measure_heights:
             noise_vec[48:235] = noise_scales.height_measurements* noise_level * self.obs_scales.height_measurements
         return noise_vec
@@ -710,6 +717,10 @@ class Go1Stand(BaseTask):
         self.base_ang_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
         self.projected_gravity = quat_rotate_inverse(self.base_quat, self.gravity_vec)
         self.init_state=torch.zeros(self.num_envs, 13, dtype=torch.float, device=self.device, requires_grad=False)
+        
+        self.action_limit_lo =torch.tensor((self.cfg.normalization.clip_actions_lo+ self.cfg.normalization.clip_actions_lo+self.cfg.normalization.clip_actions_lo+self.cfg.normalization.clip_actions_lo), device=self.device, requires_grad=False)
+        self.action_limit_hi =torch.tensor((self.cfg.normalization.clip_actions_hi+ self.cfg.normalization.clip_actions_hi+self.cfg.normalization.clip_actions_hi+self.cfg.normalization.clip_actions_hi), device=self.device, requires_grad=False)
+
         
         self.goal=to_torch(self.cfg.commands.goal, device=self.device).repeat((self.num_envs, 1))
         self.dist_to_goal=torch.ones(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)*torch.norm(self.goal, dim=-1)
@@ -1131,7 +1142,7 @@ class Go1Stand(BaseTask):
         return torch.sum(torch.square(self.last_actions_before - self.actions_before), dim=1)
     
     def _reward_hip_pos(self):
-        return torch.sum(torch.square(self.dof_pos[:,[0,3,6,9]]), dim=1)
+        return torch.sum(torch.square(self.dof_pos[:,[0,3,6,9]]),dim=1)#+0.1*torch.sum(torch.square(self.dof_pos[:,[2,5]]), dim=1)
     
     def _reward_collision(self):
         # Penalize collisions on selected bodies
@@ -1246,5 +1257,9 @@ class Go1Stand(BaseTask):
         reward=torch.sum(torch.square(self.dof_vel[:,:6]),dim=1)
         condition=torch.logical_and(self.projected_gravity[:,2]<0.1,self.projected_gravity[:,2]>-0.1)
         return torch.where(condition,reward,torch.zeros_like(reward))
-        
-        
+    
+    def _reward_action_limit(self):
+        upper=torch.square((self.actions_before-self.action_limit_hi).clip(min=0.))
+        lower=torch.square((self.action_limit_lo-self.actions_before).clip(min=0.))
+        #print('reward_action_limit:',torch.sum(upper+lower,dim=1))
+        return torch.sum(upper+lower,dim=1)

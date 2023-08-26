@@ -4,7 +4,7 @@
     <visual>
       <origin xyz="0 0 0"/>
       <geometry>
-        <sphere radius="0.27"/>
+        <sphere radius="0.17"/>
       </geometry>
       <material name="red"/>
       <color rgba="1 0 0 1" />
@@ -12,11 +12,11 @@
     <collision>
       <origin xyz="0 0 0"/>
       <geometry>
-        <sphere radius="0.27"/>
+        <sphere radius="0.17"/>
       </geometry>
     </collision>
     <inertial>
-      <mass value="0.5"/>
+      <mass value="10"/>
       <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01"/>
     </inertial>
   </link>

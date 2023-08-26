@@ -96,6 +96,7 @@ class Go1Detector(BaseTask):
         """ Reset all robots"""
         #self.foot_pos=self.foot_positions_in_base_frame(self.dof_pos).to(self.device)
         self.reset_idx(torch.arange(self.num_envs, device=self.device))
+        
         if self.cfg.env.include_history_steps is not None:
             self.obs_buf_history.reset(
                 torch.arange(self.num_envs, device=self.device),
@@ -105,6 +106,7 @@ class Go1Detector(BaseTask):
         self.fall_flag_queue.reset(torch.arange(self.num_envs, device=self.device),torch.zeros(self.num_envs,1, device=self.device))
         obs, privileged_obs, _, _, _, _, _= self.step(torch.zeros(self.num_envs, self.num_actions, device=self.device, requires_grad=False),
                                                       torch.zeros(self.num_envs, device=self.device, requires_grad=False))
+        
                                                    
         #obs, privileged_obs, _, _, _, _= self.step((self.init_dof_pos-self.default_dof_pos).repeat(self.num_envs,1))
         return obs, privileged_obs, self.mode
@@ -307,6 +309,11 @@ class Go1Detector(BaseTask):
         # send timeout info to the algorithm
         if self.cfg.env.send_timeouts:
             self.extras["time_outs"] = self.time_out_buf
+            
+        self.base_quat[env_ids] = self.root_states[env_ids, 3:7]
+        self.base_lin_vel[env_ids] = quat_rotate_inverse(self.base_quat[env_ids], self.root_states[env_ids, 7:10])
+        self.base_ang_vel[env_ids] = quat_rotate_inverse(self.base_quat[env_ids], self.root_states[env_ids, 10:13])
+        self.projected_gravity[env_ids] = quat_rotate_inverse(self.base_quat[env_ids], self.gravity_vec[env_ids])
     
     def compute_reward(self):
         """ Compute rewards
@@ -575,7 +582,7 @@ class Go1Detector(BaseTask):
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        self.dof_pos[env_ids]=torch.where(self.mode[env_ids]==0,self.front_dof,self.back_dof)
+        self.dof_pos[env_ids]=torch.where(self.mode[env_ids]==0,self.front_dof,self.back_dof)#* torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
         #self.dof_pos[env_ids] = self.front_dof #* torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
         #self.dof_pos[env_ids,7]-=self.init_pitch_bias[env_ids].squeeze(1)
         #self.dof_pos[env_ids,10]-=self.init_pitch_bias[env_ids].squeeze(1)
@@ -666,10 +673,11 @@ class Go1Detector(BaseTask):
     def _push_robots(self,env_ids):
         """ Random pushes the robots. Emulates an impulse by setting a randomized base velocity. 
         """
+    
         max_vel = self.cfg.domain_rand.max_push_vel_xy
         self.root_states[env_ids, 7:9] += torch_rand_float(-max_vel, max_vel, (len(env_ids), 2), device=self.device) # lin vel x/y
         max_vel_ang=self.cfg.domain_rand.max_push_ang
-        self.root_states[env_ids, 10:13] = torch_rand_float(-max_vel_ang, max_vel_ang, (len(env_ids), 3), device=self.device) # lin vel x/y
+        self.root_states[env_ids, 10:13]+= torch_rand_float(-max_vel_ang, max_vel_ang, (len(env_ids), 3), device=self.device) # lin vel x/y
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self.all_root_states),
@@ -813,6 +821,8 @@ class Go1Detector(BaseTask):
         if self.cfg.terrain.measure_heights:
             self.height_points = self._init_height_points()
         self.measured_heights = 0
+        
+        self.contact_filt=torch.zeros(self.num_envs, len(self.feet_indices), dtype=torch.float, device=self.device, requires_grad=False)
 
         self.fall_cri_buf = torch.zeros(self.num_envs, 2, device=self.device, dtype=torch.float)
         

@@ -137,6 +137,35 @@ class RolloutStorage:
         self.advantages = self.returns - self.values
         self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
 
+    def compute_returns_value(self, last_values, gamma, lam):
+        advantage = 0
+        for step in reversed(range(self.num_transitions_per_env)):
+            if step == self.num_transitions_per_env - 1:
+                next_values = last_values.clip(min=0.002)
+            else:
+                next_values = self.values[step + 1].clip(min=0.002)
+            next_is_not_terminal = 1.0 - self.dones[step].float()
+            if self.dones[step,0].float() > 0.1:
+                print("!!!!!!!!!!!!!!!!!!!!")
+            delta = self.rewards[step] + next_is_not_terminal * gamma *( 1/next_values) - 1/(self.values[step].clip(min=0.002))
+            advantage = delta + next_is_not_terminal * gamma * lam * advantage
+            self.returns[step] = advantage + 1/(self.values[step].clip(min=0.002))
+            # if self.dones[step,0].float() > 0.1:
+            #     print('reward:',self.rewards[step,0])
+            #     print('next_is_not_terminal:', next_is_not_terminal[0])
+            #     print('delta:',delta[0])
+            #     print('advantage:',advantage[0])
+            #     print('return:',self.returns[step,0])
+            #     print('value:',self.values[step,0])
+            print('return:',self.returns[step,0])
+                
+            #print('value:',self.values[step,0])
+            
+
+        # Compute and normalize the advantages
+        self.advantages = self.returns - self.values
+        self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
+
     def get_statistics(self):
         done = self.dones
         done[-1] = 1

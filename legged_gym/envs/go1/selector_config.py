@@ -34,12 +34,12 @@ class SelectorCfg( LeggedRobotCfg ):
 
     class env( LeggedRobotCfg.env ):
         num_envs = 5480
-        num_modes=5
-        include_history_steps = 10  # Number of steps of history to include.#3 for stand
+        num_modes=3#2#5
+        include_history_steps =3 #10  # Number of steps of history to include.#3 for stand
         num_observations =46#46#42#48 #for stand#42
-        num_privileged_obs = 72#66#48#48
-        num_selector_obs = 466
-        episode_length_s =5#20
+        num_privileged_obs =55# 54#54#70#69#73#72#66#48#48
+        num_selector_obs =141#141#463#467# 466
+        episode_length_s =5#5#20
         reference_state_initialization = False
         # reference_state_initialization_prob = 0.85
         # amp_motion_files = MOTION_FILES
@@ -50,6 +50,9 @@ class SelectorCfg( LeggedRobotCfg ):
         #rot = [0.0, -0.707107, 0.0, 0.707107] # x,y,z,w [quat]
         rot = [0., 0.0, 0.0, 1.0] # x,y,z,w [quat]
         desired_pos = [0.0, 0.0, 0.267] # x,y,z [m]
+        ball_pos=[0.,0.,0.63]
+        ball_lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
+        ball_ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
         stand_joint_angles = { # = target angles [rad] when action = 0.0
             '2_FL_hip_joint': 0.,   # [rad]
             '4_RL_hip_joint': 0.,   # [rad]
@@ -117,7 +120,7 @@ class SelectorCfg( LeggedRobotCfg ):
     
     class noise:
         #TODO: add noise to the only to the observation, not privileged observation
-        add_noise = False
+        add_noise = True
         noise_level = 1.0 # scales other values
         class noise_scales:
             dof_pos = 0.01
@@ -131,7 +134,7 @@ class SelectorCfg( LeggedRobotCfg ):
         curriculum = False
         max_curriculum = 1.
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
-        resampling_time = 9. # time before command are changed[s]
+        resampling_time = 1. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
         goal=[5,0]
         class ranges:
@@ -159,13 +162,13 @@ class SelectorCfg( LeggedRobotCfg ):
     class domain_rand(LeggedRobotCfg.terrain):
         randomize_friction = True
         friction_range = [0.5, 1.25]
-        randomize_base_mass = False
+        randomize_base_mass = True
         added_mass_range = [-1., 1.]
         push_robots = True
-        push_interval_s = 3#15
-        max_push_vel_xy = 4.
-        max_push_ang=6.
-        randomize_gains = False
+        push_interval_s = 2#15
+        max_push_vel_xy = 2.
+        max_push_ang=4.
+        randomize_gains = True
         stiffness_multiplier_range = [0.9, 1.1]
         damping_multiplier_range = [0.9, 1.1]
     
@@ -182,13 +185,14 @@ class SelectorCfg( LeggedRobotCfg ):
     class asset( LeggedRobotCfg.asset ):
         file = '/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/go1/urdf/go1.urdf'
         ball_file= '/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/ball.urdf'
-        num_balls_row=0#3
-        num_balls_col=0#3
+        num_balls_row=1
+        num_balls_col=1
         foot_name = "foot"
         rear_foot_names=["RL_foot","RR_foot"]
+        front_foot_names=["FL_foot","FR_foot"]
         penalize_contacts_on = ["base","hip","thigh", "calf"]
-        terminate_after_contacts_on = [ "base", "FL_foot", "FR_foot"]
-        #terminate_after_contacts_on = [ ]
+        #terminate_after_contacts_on = [ "base"]
+        terminate_after_contacts_on = [ ]
         self_collisions = 0 # 1 to disable, 0 to enable...bitwise filter
   
     class rewards( LeggedRobotCfg.rewards ):
@@ -201,8 +205,8 @@ class SelectorCfg( LeggedRobotCfg ):
             lin_vel_z =0# -1
             ang_vel_xy = 0.0
             orientation = 0.0
-            torques = -1e-5#-4e-7#-1e-5#-4e-7 #-0.00005 for stand
-            dof_vel =-0.15 #for stand
+            torques = 0#-1e-5#-4e-7#-1e-5#-4e-7 #-0.00005 for stand
+            dof_vel =0#-0.15 #for stand
             dof_acc =0  #-2.5e-7 for stand
             base_height = 0.0 
             feet_air_time =  0.0
@@ -220,16 +224,20 @@ class SelectorCfg( LeggedRobotCfg ):
             regular_pose=0#-0.5
             pursue_goal=0#1
             hang=0#-2
-            body_orientation=1#1
+            body_orientation=0#1#1
             body_height=0#2
-            dof_pos=1#2
+            dof_pos=0#1#2      
             foot_height=0#0.5#1
             action=0#-1e-3
             recovery=0#100
-            collision=0#-5e-6#-1e-5#-5e-4#-0.001#-5e-4
+            collision=0#-0.001#-1e-5#-5e-4#-0.001#-5e-4
             net_force=0#-5e-5#-5e-4
             yank=0#-1.25e-6#-1.25e-5#-1.25e-4#-1.25e-5
-            high_cmd=1
+            high_cmd=0#-3
+            stand=0#4.6
+            crouch=0#2.4
+            mode_change=0#-0.1
+            mode=-1
             
         only_positive_rewards = False#True # if true negative total rewards are clipped at zero (avoids early termination problems)
 
@@ -248,10 +256,10 @@ class SelectorCfgPPO( LeggedRobotCfgPPO ):
         max_iterations = 25000 # number of policy updates
         run_name = ''
         experiment_name = 'selector'
-        save_interval = 400
+        save_interval = 200
         load_stand_policy='/home/yikai/AMP_for_hardware/logs/go1_stand/Jul18_08-29-52_/model_300.pt'
-        load_run='/home/yikai/Fall_Recovery_Control/logs/selector/Jul31_12-46-45_'
-        #checkpoint = 0
+        load_run='/home/yikai/Fall_Recovery_control/logs/selector/Aug23_04-24-34_'
+        #checkpoint = 400
         resume = False#True
 
   

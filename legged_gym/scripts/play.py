@@ -52,22 +52,24 @@ def play(args):
     env_cfg.terrain.curriculum = False
     env_cfg.noise.add_noise = False#True
     env_cfg.domain_rand.randomize_friction = True
-    env_cfg.domain_rand.push_robots = False
-    env_cfg.asset.file='/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/go1/urdf/go1.urdf'
+    env_cfg.domain_rand.push_robots = True#False
+    env_cfg.asset.file='/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/go1/urdf/go1_arrow.urdf'
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     obs = env.get_observations()
     critic_obs=env.get_privileged_observations()
     # load policy
-    train_cfg.runner.resume = True
+    train_cfg.runner.resume =True
     ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
+    #policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/for_stand/exported/policies/for_stand_policy_from_Aug_06_01_57.pt').to(env.device)
+
     policy = ppo_runner.get_inference_policy(device=env.device)
     
     if EXPORT_POLICY:
         path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'policies')
 
         os.makedirs(path, exist_ok=True)
-        path_actor = os.path.join(path, 'fall_policy.pt')
+        path_actor = os.path.join(path, '.pt')
         model = copy.deepcopy(ppo_runner.alg.actor_critic.actor).to('cpu')
         traced_script_module = torch.jit.script(model)
         traced_script_module.save(path_actor)
@@ -115,9 +117,10 @@ def play(args):
     low_filter=None
     for i in range(int(4*env.max_episode_length)):
         actions = policy(obs.detach())
-        if i==0:
-            low_filter=actions
-        low_filter=0.35*low_filter+0.65*actions
+        print('actions',actions[0])
+        # if i==0:
+        #     low_filter=actions
+        # low_filter=0.35*low_filter+0.65*actions
         actions_init=actions
         #actions_init=env.init_dof_pos-env.default_dof_pos
         #actions_none=torch.zeros_like(actions)
@@ -215,7 +218,7 @@ def play(args):
     
 
 if __name__ == '__main__':
-    EXPORT_POLICY = False
+    EXPORT_POLICY = False#True
     RECORD_FRAMES = True
     MOVE_CAMERA = False
     args = get_args()

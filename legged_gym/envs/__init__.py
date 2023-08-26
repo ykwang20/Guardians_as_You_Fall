@@ -43,6 +43,10 @@ from .go1.selector import Go1Selector
 from .go1.selector_config import SelectorCfg, SelectorCfgPPO
 from .go1.detector import Go1Detector
 from .go1.detector_config import DetectorCfg, DetectorCfgPPO
+from .go1.estimator import Go1Estimator
+from .go1.estimator_config import EstimatorCfg, EstimatorCfgPPO
+from .go1.ball import Go1Ball
+from .go1.ball_config import BallCfg, BallCfgPPO
 
 
 import os
@@ -56,4 +60,7 @@ task_registry.register( "back", Go1FallBack, Go1FallBackCfg(), Go1FallBackCfgPPO
 task_registry.register( "for_back", Go1ToBack, Go1ForBackCfg(), Go1ForBackCfgPPO() )
 task_registry.register( "selector", Go1Selector, SelectorCfg(), SelectorCfgPPO() )
 task_registry.register( "detector", Go1Detector, DetectorCfg(), DetectorCfgPPO() )
+task_registry.register( "estimator", Go1Estimator, EstimatorCfg(), EstimatorCfgPPO() )
+task_registry.register( "ball", Go1Ball, BallCfg(), BallCfgPPO() )
+
 

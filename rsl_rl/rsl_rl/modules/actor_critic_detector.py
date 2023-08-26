@@ -143,6 +143,11 @@ class ActorCritic_Detector(nn.Module):
         actions_mean = self.actor(observations)
         return actions_mean
 
+    def evaluate_sample(self, critic_observations, **kwargs):
+        value = self.critic(critic_observations)
+        std = self.std.to(value.device)
+        return Normal(value, 0.25).sample()
+    
     def evaluate(self, critic_observations, **kwargs):
         value = self.critic(critic_observations)
         return value

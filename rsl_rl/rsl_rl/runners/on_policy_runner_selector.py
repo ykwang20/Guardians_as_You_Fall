@@ -81,6 +81,13 @@ class OnPolicyRunnerSelector:
         self.zero_action=torch.zeros(self.env.num_envs, self.env.num_actions, dtype=torch.float, device=self.device)
         self.offset_action=torch.zeros(self.env.num_envs, self.env.num_obs, dtype=torch.float, device=self.device)
         self.offset_action[:,-40:-28]+=((self.env.front_dof-self.env.avg_dof)*env.obs_scales.dof_pos).unsqueeze(0)
+        self.offset_action[:,-16:-4]=(-self.env.avg_dof).unsqueeze(0)
+        
+        self.front_offset=torch.zeros(self.env.num_envs, 3*self.env.num_obs, dtype=torch.float, device=self.device)
+        self.front_offset[:,30:42]=(-self.env.front_dof).unsqueeze(0)
+        self.front_offset[:,(46+30):(46+42)]=(-self.env.front_dof).unsqueeze(0)
+        self.front_offset[:,(2*46+30):(2*46+42)]=(-self.env.front_dof).unsqueeze(0)
+
 
         # init storage and model
         self.alg.init_storage(self.env.num_envs, self.num_steps_per_env, [num_selector_obs], [self.env.num_privileged_obs], [self.env.num_modes])
@@ -93,11 +100,12 @@ class OnPolicyRunnerSelector:
         self.current_learning_iteration = 0
 
         _,_=self.env.reset()
-        self.front_stand_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/for_stand/exported/policies/front_stand_policy.pt').to(self.device)
-        self.back_stand_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_stand/exported/policies/back_stand_policy.pt').to(self.device)
-        self.fall_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/go1_fall_back/exported/policies/fall_policy.pt').to(self.device)
+        self.front_stand_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/for_stand/exported/policies/stand_kp20_8_21.pt').to(self.device)
+        self.back_stand_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_stand/exported/policies/back_stand_policy_from_Aug06_01-53.pt').to(self.device)
+        self.fall_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/ball/exported/policies/strike_fall.pt').to(self.device)
         self.back_front_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_to_forward/exported/policies/back_for_policy.pt').to(self.device)
         self.front_back_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/forward_to_back/exported/policies/for_back_policy.pt').to(self.device)
+        self.estimator=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/estimator/exported/policies/estimator_triple.pt').to(self.device)
     
     def learn(self, num_learning_iterations, init_at_random_ep_len=False):
         # initialize writer
@@ -108,6 +116,9 @@ class OnPolicyRunnerSelector:
         obs = self.env.get_observations()
         privileged_obs = self.env.get_privileged_observations()
         critic_obs = privileged_obs if privileged_obs is not None else obs
+        #rec_time=self.estimator(obs[:,-10*self.env.num_obs:])
+        #obs=torch.cat((rec_time,obs),dim=1)
+        #critic_obs= torch.cat((rec_time,critic_obs),dim=1)
         obs, critic_obs = obs.to(self.device), critic_obs.to(self.device)
         self.alg.actor_critic.train() # switch to train mode (for dropout for example)
 
@@ -121,19 +132,29 @@ class OnPolicyRunnerSelector:
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
             # Rollout
+            
             with torch.inference_mode():
+                
                 for i in range(self.num_steps_per_env):
+                    
                     actions = self.alg.act_high(obs, critic_obs)
-                    mode=torch.argmax(actions, dim=1).unsqueeze(1)
-                    for _ in range(2):
-                        low_actions=torch.where(mode==0, self.front_stand_policy(obs[:,-3*self.env.num_obs:]),self.zero_action)
-                        low_actions+=torch.where(mode==1, self.back_stand_policy(obs[:,-3*self.env.num_obs:]),self.zero_action)
-                        low_actions+=torch.where(mode==2, self.fall_policy(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
+                    mode=torch.argmax(actions[:,:2], dim=1).unsqueeze(1)
+                    height=actions[:,2]
+                    #print('mode',mode[0])
+                    
+                    for _ in range(1):
+                        low_actions=torch.where(mode==0, self.front_stand_policy(obs[:,-3*self.env.num_obs:]+self.front_offset),self.zero_action)
+                        low_actions+=torch.where(mode==2, self.back_stand_policy(obs[:,-3*self.env.num_obs:]+self.front_offset),self.zero_action)
+                        low_actions+=torch.where(mode==1, self.fall_policy(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
                         low_actions+=torch.where(mode==3, self.back_front_policy(obs[:,-self.env.num_obs:]),self.zero_action)
                         low_actions+=torch.where(mode==4, self.front_back_policy(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
                         
-                        obs, privileged_obs, rewards, dones, infos, _= self.env.step(low_actions,mode.squeeze(1))
+                        obs, privileged_obs, rewards, dones, infos, _= self.env.step(low_actions,mode.squeeze(1),height)
+                        #obs, privileged_obs, rewards, dones, infos, _= self.env.step(low_actions,mode.squeeze(1),torch.zeros_like(mode))
                         critic_obs = privileged_obs if privileged_obs is not None else obs
+                        #rec_time=1/self.estimator(obs[:,-10*self.env.num_obs:])
+                        #obs=torch.cat((rec_time,obs),dim=1)
+                        #critic_obs= torch.cat((rec_time,critic_obs),dim=1)
                         obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
                         self.alg.process_env_step_high(rewards, dones, infos)
                     self.alg.record_high()

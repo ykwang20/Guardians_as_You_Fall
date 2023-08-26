@@ -45,14 +45,14 @@ def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     
     # override some parameters for testing
-    env_cfg.env.num_envs =min(env_cfg.env.num_envs, 1)
+    #env_cfg.env.num_envs =min(env_cfg.env.num_envs, 1)
     #env_cfg.terrain.num_rows = 20
     #env_cfg.terrain.num_cols = 20
     env_cfg.terrain.mesh_type='plane'
     env_cfg.terrain.curriculum = False
     env_cfg.noise.add_noise = False#True
     env_cfg.domain_rand.randomize_friction = True
-    env_cfg.domain_rand.push_robots = False#True
+    env_cfg.domain_rand.push_robots = True
     env_cfg.asset.file='/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/go1/urdf/go1_arrow.urdf'
     print(LEGGED_GYM_ROOT_DIR)
     # prepare environment
@@ -63,14 +63,13 @@ def play(args):
     train_cfg.runner.resume = True
     ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
     policy = ppo_runner.get_inference_policy(device=env.device)
-    estimator=ppo_runner.get_estimator()
     
     if EXPORT_POLICY:
         path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'policies')
 
         os.makedirs(path, exist_ok=True)
-        path_actor = os.path.join(path, 'estimator.pt')
-        model = copy.deepcopy(ppo_runner.alg.actor_critic.critic).to('cpu')
+        path_actor = os.path.join(path, '.pt')
+        model = copy.deepcopy(ppo_runner.alg.actor_critic.actor).to('cpu')
         traced_script_module = torch.jit.script(model)
         traced_script_module.save(path_actor)
 
@@ -109,21 +108,6 @@ def play(args):
     font_color = (255, 0, 255)  
     font_thickness = 2
     
-    FL_hip=[]
-    FL_thigh=[]
-    FL_calf=[]
-    
-    FR_hip=[]
-    FR_thigh=[]
-    FR_knee=[]
-    
-    RL_hip=[]
-    RL_thigh=[]
-    RL_calf=[]
-    
-    RR_hip=[]
-    RR_thigh=[]
-    RR_calf=[]
     
     names=['FL_hip','FL_thigh','FL_calf','FR_hip','FR_thigh','FR_knee','RL_hip','RL_thigh','RL_calf','RR_hip','RR_thigh','RR_calf']
     
@@ -145,30 +129,22 @@ def play(args):
     fall_flags=[]
     recovery_times=[]
     with torch.no_grad():
-        for i in range(int(150)):
+        for i in range(int(2000)):
             env.high_cmd[0,:]=0
-            fall_detect = policy(obs[:,:10*env.num_obs])
-            #print('fall detect:',(torch.sum(fall_detect,dim=0)/env_cfg.env.num_envs).cpu().numpy())
-            fall_detects.append((torch.sum(fall_detect,dim=0)/env_cfg.env.num_envs).cpu().numpy())
-            #print('fall flag:',(torch.sum(env.privileged_obs_buf.squeeze(1),dim=0)/env_cfg.env.num_envs).cpu().numpy())
-            fall_flags.append((torch.sum(env.privileged_obs_buf.squeeze(1),dim=0)/env_cfg.env.num_envs).cpu().numpy())
+            #env.mode[:]=0
+            low_actions=torch.where(env.mode==0, ppo_runner.front_stand_policy(obs[:,-3*env.num_obs:]),ppo_runner.zero_action)
+            low_actions+=torch.where(env.mode==1, ppo_runner.back_stand_policy(obs[:,-3*env.num_obs:]),ppo_runner.zero_action)
+            low_actions+=torch.where(env.mode==2, policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
+            low_actions+=torch.where(env.mode==3, ppo_runner.back_front_policy(obs[:,-env.num_obs:]),ppo_runner.zero_action)
+            low_actions+=torch.where(env.mode==4, ppo_runner.front_back_policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
+            #low_actions+=torch.where(env.mode==-1, policy(obs),ppo_runner.zero_action)
+            actions_none=torch.zeros_like(low_actions)
+            print('low_actions',low_actions[0])
             
-            low_actions=torch.where(ppo_runner.mode==0, ppo_runner.front_stand_policy(obs[:,-3*env.num_obs:]),ppo_runner.zero_action)
-            low_actions+=torch.where(ppo_runner.mode==1, ppo_runner.back_stand_policy(obs[:,-3*env.num_obs:]),ppo_runner.zero_action)
-            low_actions+=torch.where(ppo_runner.mode==2, ppo_runner.fall_policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
-            # low_actions+=torch.where(mode==3, ppo_runner.back_front_policy(obs[:,-env.num_obs:]),ppo_runner.zero_action)
-            # low_actions+=torch.where(mode==4, ppo_runner.front_back_policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
+            obs, privileged_obs, rewards, dones, infos, _=env.step(low_actions)
+            #obs, privileged_obs, rewards, dones, infos, _=env.step(actions_none)
+            #ppo_runner.mode=mode 
             
-            obs, privileged_obs, rewards, dones, infos, _,mode=env.step(low_actions,fall_detect)
-            for j in range(12):
-                dofs[j,i]=env.dof_pos[0,j]
-            ppo_runner.mode=mode 
-            #print(privileged_obs[:,0])
-            input=torch.randn_like(privileged_obs)
-            rec_time=1/(ppo_runner.alg.actor_critic.evaluate(obs))
-            print('recovery time:',rec_time)
-            print('mode:',mode)
-            recovery_times.append(rec_time.squeeze().cpu().numpy())
             # base_contact_forces.append((torch.norm(env.contact_forces[:, 0, 2],dim=0)/env_cfg.env.num_envs).cpu().numpy())
             # base_vel.append((torch.norm(env.rigid_lin_vel[:, 0,:],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
             # base_acc.append((torch.norm(env.rigid_acc[:, 0,:],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
@@ -188,8 +164,7 @@ def play(args):
                 img = cv2.imread(filename)
                 if video is None:
                     video = cv2.VideoWriter('new_dataset.mp4', cv2.VideoWriter_fourcc(*'MP4V'), int(1 / env.dt), (img.shape[1],img.shape[0]))
-                text = f'Est time to fall: {rec_time.squeeze().cpu().numpy()}'
-                cv2.putText(img, text, (10, 500), font, font_scale, font_color, font_thickness)
+                
                 video.write(img)
                 img_idx += 1 
                 print(filename)
@@ -289,7 +264,7 @@ def play(args):
         
 
 if __name__ == '__main__':
-    EXPORT_POLICY = False#True
+    EXPORT_POLICY =False# True
     RECORD_FRAMES = True
     MOVE_CAMERA = False
     args = get_args()

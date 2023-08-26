@@ -35,10 +35,10 @@ class Go1FallBackCfg( LeggedRobotCfg ):
 
     class env( LeggedRobotCfg.env ):
         num_envs = 5480
-        include_history_steps = None  # Number of steps of history to include.#3 for stand
+        include_history_steps = 3#None  # Number of steps of history to include.#3 for stand
         num_observations =46#46#42#48 #for stand#42
         num_privileged_obs = 66#66#48#48
-        episode_length_s =5#1.5#10.
+        episode_length_s =5#10.
         reference_state_initialization = False
         # reference_state_initialization_prob = 0.85
         # amp_motion_files = MOTION_FILES
@@ -49,6 +49,9 @@ class Go1FallBackCfg( LeggedRobotCfg ):
         rot = [0.0, -0.707107, 0.0, 0.707107] # x,y,z,w [quat]
         #rot = [0., -1.0, 0.0, 0.0] # x,y,z,w [quat]
         desired_pos = [0.0, 0.0, 0.267] # x,y,z [m]
+        ball_pos=[0.,0.,0.63]
+        ball_lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
+        ball_ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
         init_joint_angles = { # = target angles [rad] when action = 0.0
             '2_FL_hip_joint': 0.,   # [rad]
             '4_RL_hip_joint': 0.,   # [rad]
@@ -160,8 +163,8 @@ class Go1FallBackCfg( LeggedRobotCfg ):
         friction_range = [0.5, 1.25]
         randomize_base_mass = False
         added_mass_range = [-1., 1.]
-        push_robots = False#True
-        push_interval_s = 9#15
+        push_robots = True
+        push_interval_s = 1#15
         max_push_vel_xy = 1.
         randomize_gains = False
         stiffness_multiplier_range = [0.9, 1.1]
@@ -180,8 +183,8 @@ class Go1FallBackCfg( LeggedRobotCfg ):
     class asset( LeggedRobotCfg.asset ):
         file = '/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/go1/urdf/go1.urdf'
         ball_file= '/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/ball.urdf'
-        num_balls_row=0#3
-        num_balls_col=0#3
+        num_balls_row=1
+        num_balls_col=1
         foot_name = "foot"
         rear_foot_names=["RL_foot","RR_foot"]
         penalize_contacts_on = ["base","hip","thigh", "calf"]
