@@ -60,22 +60,22 @@ class RolloutStorage:
         self.actions_shape = actions_shape
 
         # Core
-        self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape, device=self.device)
+        self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape, device=self.device)+0.001
         if privileged_obs_shape[0] is not None:
-            self.privileged_observations = torch.zeros(num_transitions_per_env, num_envs, *privileged_obs_shape, device=self.device)
+            self.privileged_observations = torch.zeros(num_transitions_per_env, num_envs, *privileged_obs_shape, device=self.device)+0.001
         else:
             self.privileged_observations = None
-        self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
+        self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)+0.001
+        self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)+0.001
         self.dones = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device).byte()
 
         # For PPO
-        self.actions_log_prob = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.values = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.returns = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.mu = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
-        self.sigma = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
+        self.actions_log_prob = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)+0.001
+        self.values = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)+0.001
+        self.returns = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)+0.001
+        self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)+0.001
+        self.mu = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)+0.001
+        self.sigma = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)+0.001
 
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
@@ -99,6 +99,41 @@ class RolloutStorage:
         self.mu[self.step].copy_(transition.action_mean)
         self.sigma[self.step].copy_(transition.action_sigma)
         self._save_hidden_states(transition.hidden_states)
+        self.step += 1
+        
+    def add_transitions_mode(self, transition: Transition, env_ids, zero_env_ids):
+        
+        
+        if self.step >= self.num_transitions_per_env:
+            raise AssertionError("Rollout buffer overflow")
+        
+        #print('observation_after',self.observations[self.step,env_ids])
+        if len(env_ids)>0:
+            self.observations[self.step,env_ids]=transition.observations
+            if self.privileged_observations is not None: self.privileged_observations[self.step,env_ids]=transition.critic_observations
+            self.actions[self.step,env_ids]=transition.actions
+            self.rewards[self.step,env_ids]=transition.rewards.view(-1, 1)
+            self.dones[self.step,env_ids]=transition.dones.view(-1, 1).byte()
+            self.values[self.step,env_ids]=transition.values[env_ids]
+            self.actions_log_prob[self.step,env_ids]=transition.actions_log_prob.view(-1, 1)
+            self.mu[self.step,env_ids]=transition.action_mean
+            self.sigma[self.step,env_ids]=transition.action_sigma
+            self._save_hidden_states(transition.hidden_states)
+        
+        
+            ids=torch.randint(len(env_ids),size=(len(zero_env_ids),))
+            self.observations[self.step,zero_env_ids]=self.observations[self.step,env_ids[ids]]
+            self.privileged_observations[self.step,zero_env_ids]=self.privileged_observations[self.step,env_ids[ids]]
+            self.actions[self.step,zero_env_ids]=self.actions[self.step,env_ids[ids]]
+            self.rewards[self.step,zero_env_ids]=self.rewards[self.step,env_ids[ids]]
+            self.dones[self.step,zero_env_ids]=self.dones[self.step,env_ids[ids]]
+            self.values[self.step,zero_env_ids]=self.values[self.step,env_ids[ids]]
+            self.actions_log_prob[self.step,zero_env_ids]=self.actions_log_prob[self.step,env_ids[ids]]
+            self.mu[self.step,zero_env_ids]=self.mu[self.step,env_ids[ids]]
+            self.sigma[self.step,zero_env_ids]=self.sigma[self.step,env_ids[ids]]
+        
+        
+        
         self.step += 1
 
     def _save_hidden_states(self, hidden_states):

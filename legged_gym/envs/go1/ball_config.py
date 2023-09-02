@@ -75,14 +75,14 @@ class BallCfg( LeggedRobotCfg ):
             '1_FR_hip_joint': 0. ,  # [rad]
             '3_RR_hip_joint': 0.,   # [rad]
 
-            '2_FL_thigh_joint': 4.0416,     # [rad]
+            '2_FL_thigh_joint': 3.7,     # [rad]
             '4_RL_thigh_joint': 4.0416,   # [rad]
-            '1_FR_thigh_joint': 4.0416,     # [rad]
+            '1_FR_thigh_joint': 3.7,     # [rad]
             '3_RR_thigh_joint': 4.0416,   # [rad]
 
-            '2_FL_calf_joint': -1.8,   # [rad]
+            '2_FL_calf_joint': -1.5,   # [rad]
             '4_RL_calf_joint': -1.8,    # [rad]
-            '1_FR_calf_joint': -1.8,  # [rad]
+            '1_FR_calf_joint': -1.5,  # [rad]
             '3_RR_calf_joint': -1.8,    # [rad]
         }
         avg_joint_angles={
@@ -123,10 +123,10 @@ class BallCfg( LeggedRobotCfg ):
         add_noise = True
         noise_level = 1.0 # scales other values
         class noise_scales:
-            dof_pos = 0.01
+            dof_pos = 0.03
             dof_vel = 1.5
             lin_vel = 0.1
-            ang_vel = 0.2
+            ang_vel = 0.3
             gravity = 0.05
             height_measurements = 0.1
             
@@ -199,7 +199,7 @@ class BallCfg( LeggedRobotCfg ):
         self_collisions = 0 # 1 to disable, 0 to enable...bitwise filter
   
     class rewards( LeggedRobotCfg.rewards ):
-        soft_dof_pos_limit = 0.9
+        soft_dof_pos_limit = 0.975
         base_height_target = 0.25
         class scales( LeggedRobotCfg.rewards.scales ):
             termination = 0.0
@@ -210,7 +210,7 @@ class BallCfg( LeggedRobotCfg ):
             orientation = 0.0
             torques = -0.00001#-4e-7#-1e-5#-4e-7 #-0.00005 for stand
             dof_vel =0#-0.15 #for stand
-            dof_acc =-1e-8#-2.5e-8#-2.5e-7 #for stand
+            dof_acc =0#-1e-8#-2.5e-8#-2.5e-7 #for stand
             base_height = 0.0 
             feet_air_time =  0.0
             feet_stumble = 0.0 
@@ -218,7 +218,7 @@ class BallCfg( LeggedRobotCfg ):
             action_rate=-5e-3#-2.5e-3#-5e-4#-0.005for stand
             hip_pos=0#-0.1
             stand_still = 0.0
-            dof_pos_limits = 0.0
+            dof_pos_limits = -10
             upright=0 #1.0 for stand
             max_height=0 #1.0for stand
             work=0#-0.003
@@ -233,9 +233,9 @@ class BallCfg( LeggedRobotCfg ):
             foot_height=1#0.5#1
             action=0#-1e-3
             recovery=0#100
-            collision=0#-5e-5#-5e-4#-1e-5#-5e-4#-0.001#-5e-4
-            net_force=0#-5e-5#-5e-4
-            yank=0#-1.25e-6#-1.25e-5#-1.25e-4#-1.25e-5
+            collision=-5e-5#-5e-4#-1e-5#-5e-4#-0.001#-5e-4
+            net_force=-5e-5#-5e-4
+            yank=-1.25e-5#-1.25e-6#-1.25e-5#-1.25e-4#-1.25e-5
             high_cmd=0#1
             stand=0#4.6
             crouch=0#1.1
@@ -259,8 +259,8 @@ class BallCfgPPO( LeggedRobotCfgPPO ):
         experiment_name = 'ball'
         save_interval = 200
         load_stand_policy='/home/yikai/AMP_for_hardware/logs/go1_stand/Jul18_08-29-52_/model_300.pt'
-        load_run='/home/yikai/Fall_Recovery_control/logs/ball/Aug21_10-23-23_'
-        #checkpoint = 400
+        load_run='/home/yikai/Fall_Recovery_control/logs/ball/Aug27_17-36-43_'
+        #checkpoint = 4000
         resume = False#True
 
   

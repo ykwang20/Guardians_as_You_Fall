@@ -151,6 +151,7 @@ class Go1Ball(BaseTask):
         # mode_one_hot.scatter_(1, torch.tensor(mode).unsqueeze(1), 1)
         # selector_obs=torch.cat((mode_one_hot,self.high_cmd,policy_obs),dim=1)
         #self.privileged_obs_buf=torch.cat((mode_one_hot,self.high_cmd,self.privileged_obs_buf),dim=1)
+
         
         return policy_obs, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, reset_env_ids
 
@@ -197,7 +198,7 @@ class Go1Ball(BaseTask):
         self.rigid_jerk=torch.where(self.episode_length_buf.unsqueeze(1).unsqueeze(2)<3,torch.zeros_like(rigid_jerk),rigid_jerk)
         
         self.check_ball_contact() # put before strike ball
-        self._post_physics_step_callback()
+        strike_env_ids=self._post_physics_step_callback()
         
         self.compute_reward()
         
@@ -213,7 +214,7 @@ class Go1Ball(BaseTask):
         
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
         #terminal_amp_states = self.get_amp_observations()[env_ids]
-        self.reset_idx(env_ids)
+        self.reset_idx(env_ids, strike_env_ids)
         self.compute_observations() # in some cases a simulation step might be required to refresh some obs (for example body positions)
 
 
@@ -230,17 +231,21 @@ class Go1Ball(BaseTask):
         #self.recovered_buf=torch.logical_and(torch.square(0.5-0.5*self.projected_gravity[:,2])>0.95 , torch.clip(torch.sum(torch.square(self.dof_pos-self.default_dof_pos),dim=1)/20,min=0.,max=1.)<0.05)
         #self.recovered_buf=torch.logical_and(self.recovered_buf , torch.exp(-10*torch.sum(torch.square(self.feet_pos[:,:,2]),dim=1))>0.8)
         #TODO:
-        #self.recovered_buf=torch.logical_and(self.recovered_buf , torch.exp(-10*torch.sum(torch.square(self.feet_pos[:,2]),dim=1))>0.2)
+        #self.recovered_buf = torch.logical_and(self.recovered_buf , torch.exp(-10*torch.sum(torch.square(self.feet_pos[:,2]),dim=1))>0.2)
         self.reset_buf |= self.time_out_buf
+        #print('episode_length_buf:',self.episode_length_buf[0])
         #self.reset_buf |= self.recovered_buf#TODO: remove this line
         
     def check_ball_contact(self):
         ball_contact=torch.logical_and(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1,self.striked_buf)
+        #ball_contact=torch.logical_and(torch.norm(self.rigid_acc[:,0,:], dim=-1) > 10.7,self.striked_buf)
         #print('contact, striked, ball_contact:',(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1)[0],self.striked_buf[0],ball_contact[0])
         contact_ids=ball_contact.nonzero(as_tuple=False).flatten()
+        
         self.mode[contact_ids]=2
+        #self.mode[:5000]=2
 
-    def reset_idx(self, env_ids):
+    def reset_idx(self, env_ids, strike_env_ids=None):
         """ Reset some environments.
             Calls self._reset_dofs(env_ids), self._reset_root_states(env_ids), and self._resample_commands(env_ids)
             [Optional] calls self._update_terrain_curriculum(env_ids), self.update_command_curriculum(env_ids) and
@@ -252,8 +257,8 @@ class Go1Ball(BaseTask):
         """
         if len(env_ids) == 0 :
             return
+        
         # update curriculum
-        self.mode[env_ids]=torch.randint(0,1,(len(env_ids),1),device=self.device)
         if self.cfg.terrain.curriculum:
             self._update_terrain_curriculum(env_ids)
         # avoid updating command curriculum at each step since the maximum command is common to all envs
@@ -262,7 +267,7 @@ class Go1Ball(BaseTask):
         
         # reset robot states
         
-        self._reset_root_states(env_ids)
+        self._reset_root_states(env_ids,strike_env_ids)
         self._reset_dofs(env_ids)
             
 
@@ -284,6 +289,8 @@ class Go1Ball(BaseTask):
         self.episode_length_buf[env_ids] = 0
         self.reset_buf[env_ids] = 1
         self.striked_buf[env_ids] = 0
+        self.mode[env_ids]=torch.randint(0,1,(len(env_ids),1),device=self.device)
+
         # fill extras
         self.extras["episode"] = {}
         for key in self.episode_sums.keys():
@@ -357,6 +364,8 @@ class Go1Ball(BaseTask):
 
         self.privileged_obs_buf=torch.cat((self.contact_forces[...,2].view(self.num_envs,-1)*0.1, self.privileged_obs_buf),dim=-1)
         self.obs_buf = self.privileged_obs_buf[:, -self.num_obs:]
+        # print('dofs', self.dof_pos[0, :])
+        # print('base height', self.root_states[0, 2])
         
         # add noise if needed
         if self.add_noise:
@@ -408,14 +417,15 @@ class Go1Ball(BaseTask):
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
         
     def strike_ball(self,env_ids):
+        env_ids=env_ids[:len(env_ids)//2]
         if len(env_ids)==0:
             return 
         if 0 in env_ids:
             print('strike_ball')
         if torch.rand(1)>0.5:
-            ball_vel_xy = torch_rand_float(-8.5, -1, (len(env_ids), 2), device=self.device)
+            ball_vel_xy = torch_rand_float(-5., -1, (len(env_ids), 2), device=self.device)
         else:
-            ball_vel_xy = torch_rand_float(1, 8.5, (len(env_ids), 2), device=self.device)
+            ball_vel_xy = torch_rand_float(1, 5., (len(env_ids), 2), device=self.device)
         #ball_vel_xy[:,1]=0
         ball_ang_vel = torch_rand_float(-5, 5, (len(env_ids), 3), device=self.device)
         flying_time=0.2
@@ -431,9 +441,12 @@ class Go1Ball(BaseTask):
         self.ball_states[env_ids, 10:13]=ball_ang_vel
         
         env_ids_int32_ball = (1+self.balls_per_env)*env_ids.to(dtype=torch.int32) + 1
+        id_in_all=(1+self.balls_per_env)*env_ids
+        self.all_root_states[id_in_all] = self.ball_states[env_ids]
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self.all_root_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32_ball), len(env_ids_int32_ball))
+        
         
         
 
@@ -491,7 +504,7 @@ class Go1Ball(BaseTask):
                 self.dof_pos_limits[i, 1] = m + 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
             # self.dof_pos_limits[:,0] = -1.7
             # self.dof_pos_limits[:,1] = 2.2
-            print("pos_limit",self.dof_pos_limits[0])
+            print("pos_limit",self.dof_pos_limits)
             print("vel_limit",self.dof_vel_limits)
             print("torque_limit",self.torque_limits)
         return props
@@ -532,6 +545,7 @@ class Go1Ball(BaseTask):
         if self.cfg.domain_rand.push_robots:
             self.strike_ball(strike_env_ids)
             self.striked_buf[strike_env_ids] = 1
+        return strike_env_ids
 
 
 
@@ -632,7 +646,7 @@ class Go1Ball(BaseTask):
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
         # print("dof",self.dof_pos[env_ids])
 
-    def _reset_root_states(self, env_ids):
+    def _reset_root_states(self, env_ids, strike_env_ids):
         """ Resets ROOT states position and velocities of selected environmments
             Sets base position based on the curriculum
             Selects randomized base velocities within -0.5:0.5 [m/s, rad/s]
@@ -667,7 +681,10 @@ class Go1Ball(BaseTask):
                                                      gymtorch.unwrap_tensor(self.all_root_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
         
+        # if strike_env_ids !=None:
+        #     env_ids=torch.unique(torch.cat((env_ids,strike_env_ids)))
         env_ids_int32_ball = (1+self.balls_per_env)*env_ids.to(dtype=torch.int32) + 1
+        
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self.all_root_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32_ball), len(env_ids_int32_ball))

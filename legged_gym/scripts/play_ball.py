@@ -48,12 +48,13 @@ def play(args):
     #env_cfg.env.num_envs =min(env_cfg.env.num_envs, 1)
     #env_cfg.terrain.num_rows = 20
     #env_cfg.terrain.num_cols = 20
-    env_cfg.terrain.mesh_type='plane'
+    #env_cfg.terrain.mesh_type='plane'
     env_cfg.terrain.curriculum = False
     env_cfg.noise.add_noise = False#True
     env_cfg.domain_rand.randomize_friction = True
     env_cfg.domain_rand.push_robots = True
     env_cfg.asset.file='/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/go1/urdf/go1_arrow.urdf'
+    env_cfg.domain_rand.max_push_vel_xy=4
     print(LEGGED_GYM_ROOT_DIR)
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
@@ -91,14 +92,14 @@ def play(args):
     camera_properties = gymapi.CameraProperties()
     camera_properties.width = 1920
     camera_properties.height = 1080
-    h1 = env.gym.create_camera_sensor(env.envs[0], camera_properties)
+    h1 = env.gym.create_camera_sensor(env.envs[robot_index], camera_properties)
     camera_offset = gymapi.Vec3(1, -1, 0.5)
     camera_rotation = gymapi.Quat.from_axis_angle(gymapi.Vec3(-0.3, 0.2, 1),
                                                   np.deg2rad(135))
-    actor_handle = env.gym.get_actor_handle(env.envs[0], 0)
-    body_handle = env.gym.get_actor_rigid_body_handle(env.envs[0], actor_handle, 0)
+    actor_handle = env.gym.get_actor_handle(env.envs[robot_index], 0)
+    body_handle = env.gym.get_actor_rigid_body_handle(env.envs[robot_index], actor_handle, 0)
     env.gym.attach_camera_to_body(
-        h1, env.envs[0], body_handle,
+        h1, env.envs[robot_index], body_handle,
         gymapi.Transform(camera_offset, camera_rotation),
         gymapi.FOLLOW_POSITION)
     path=os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'frames')
@@ -121,6 +122,8 @@ def play(args):
     tot_contact_forces=[]
     tot_yank=[]
     tot_net_force=[]
+    tot_power=[]
+    tot_power=[]
     video=None
     img_idx=0
     low_filter=None
@@ -128,10 +131,19 @@ def play(args):
     fall_detects=[]
     fall_flags=[]
     recovery_times=[]
+    #policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/curr/exported/policies/8_31_init_angle.pt').to(env.device)
+
     with torch.no_grad():
-        for i in range(int(2000)):
+        for i in range(int(12*env.max_episode_length)):
+            if i==4*env.max_episode_length:
+                policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/curr/exported/policies/8_31_init_angle.pt').to(env.device)
+                env.reset()
+            
             env.high_cmd[0,:]=0
             #env.mode[:]=0
+            if i>=8*env.max_episode_length:
+                env.mode[:]=0
+            print('mode:',env.mode[robot_index])
             low_actions=torch.where(env.mode==0, ppo_runner.front_stand_policy(obs[:,-3*env.num_obs:]),ppo_runner.zero_action)
             low_actions+=torch.where(env.mode==1, ppo_runner.back_stand_policy(obs[:,-3*env.num_obs:]),ppo_runner.zero_action)
             low_actions+=torch.where(env.mode==2, policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
@@ -139,7 +151,7 @@ def play(args):
             low_actions+=torch.where(env.mode==4, ppo_runner.front_back_policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
             #low_actions+=torch.where(env.mode==-1, policy(obs),ppo_runner.zero_action)
             actions_none=torch.zeros_like(low_actions)
-            print('low_actions',low_actions[0])
+            #print('low_actions',low_actions[0])
             
             obs, privileged_obs, rewards, dones, infos, _=env.step(low_actions)
             #obs, privileged_obs, rewards, dones, infos, _=env.step(actions_none)
@@ -149,9 +161,11 @@ def play(args):
             # base_vel.append((torch.norm(env.rigid_lin_vel[:, 0,:],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
             # base_acc.append((torch.norm(env.rigid_acc[:, 0,:],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
             # base_jerk.append((torch.norm(env.rigid_jerk[:, 0,:],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
-            # tot_contact_forces.append((torch.norm(env.contact_forces[:, :, 2],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
-            # tot_net_force.append((torch.sum(torch.norm(env.rigid_acc[:,env.penalised_contact_indices]*env.rigid_mass[:,env.penalised_contact_indices].unsqueeze(-1),dim=-1),dim=(0,-1))/env_cfg.env.num_envs).cpu().numpy())
-            # tot_yank.append((torch.sum(torch.square(env.rigid_jerk[:,env.penalised_contact_indices]*env.rigid_mass[:,env.penalised_contact_indices].unsqueeze(-1)*env.dt),dim=(-1,-2,-3))/env_cfg.env.num_envs).cpu().numpy())
+            if env.episode_length_buf[0]>=56:
+                tot_contact_forces.append((torch.sum(torch.square(env.contact_forces[:, env.penalised_contact_indices, 2]),dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
+                tot_net_force.append((torch.sum(torch.square(env.rigid_acc[:,env.penalised_contact_indices,2]*env.rigid_mass[:,env.penalised_contact_indices]),dim=(0,-1))/env_cfg.env.num_envs).cpu().numpy())
+                tot_yank.append((torch.sum(torch.square(env.rigid_jerk[:,env.penalised_contact_indices,2]*env.rigid_mass[:,env.penalised_contact_indices]*env.dt),dim=(-1,-2))/env_cfg.env.num_envs).cpu().numpy())
+                tot_power.append((torch.sum((env.torques*env.dof_vel).clip(min=0),dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
             #print(mode)
             if RECORD_FRAMES:
                 #if i % 2:
@@ -160,10 +174,12 @@ def play(args):
                 env.gym.fetch_results(env.sim, True)
                 env.gym.step_graphics(env.sim)
                 env.gym.render_all_camera_sensors(env.sim)
-                env.gym.write_camera_image_to_file(env.sim, env.envs[0], h1,gymapi.IMAGE_COLOR, filename)
+                env.gym.write_camera_image_to_file(env.sim, env.envs[robot_index], h1,gymapi.IMAGE_COLOR, filename)
                 img = cv2.imread(filename)
                 if video is None:
-                    video = cv2.VideoWriter('new_dataset.mp4', cv2.VideoWriter_fourcc(*'MP4V'), int(1 / env.dt), (img.shape[1],img.shape[0]))
+                    name=train_cfg.runner.load_run.split('/')[-1]
+                    video_name=name+'.mp4'
+                    video = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'MP4V'), int(1 / env.dt), (img.shape[1],img.shape[0]))
                 
                 video.write(img)
                 img_idx += 1 
@@ -208,37 +224,37 @@ def play(args):
         # plt.savefig('visualize.png')
         
 
-# 创建一个包含12个子图的4x3网格
-    fig, axs = plt.subplots(4, 3, figsize=(12, 12))
+# # 创建一个包含12个子图的4x3网格
+#     fig, axs = plt.subplots(4, 3, figsize=(12, 12))
 
-# 生成一些示例数据和标签
+# # 生成一些示例数据和标签
 
-# 在每个子图上绘制3根曲线
-    for i in range(4):
-        for j in range(3):
-            ax = axs[i, j]
-            data=dofs[3*i+j].cpu().numpy()
-            ax.plot(data[:50], label='stand policy')
-            ax.plot(data[50:100], label='fall policy')
-            ax.plot(data[100:], label='no actuation')
-            ax.set_title(names[i * 3 + j])
-            ax.legend()
+# # 在每个子图上绘制3根曲线
+#     for i in range(4):
+#         for j in range(3):
+#             ax = axs[i, j]
+#             data=dofs[3*i+j].cpu().numpy()
+#             ax.plot(data[:50], label='stand policy')
+#             ax.plot(data[50:100], label='fall policy')
+#             ax.plot(data[100:], label='no actuation')
+#             ax.set_title(names[i * 3 + j])
+#             ax.legend()
 
-# 调整子图之间的间距和整体布局
-        plt.tight_layout()
-        labels = ['stand policy', 'fall policy', 'no actuation']
+# # 调整子图之间的间距和整体布局
+#         plt.tight_layout()
+#         labels = ['stand policy', 'fall policy', 'no actuation']
 
 
-    # 添加总的图例
-        handles, labels = ax.get_legend_handles_labels()
-        fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(0.95, 0.95))
+#     # 添加总的图例
+#         handles, labels = ax.get_legend_handles_labels()
+#         fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(0.95, 0.95))
 
-# 显示图形
-        plt.savefig('compare.png')
+# # 显示图形
+        # plt.savefig('compare.png')
         
-        plt.plot(recovery_times)
-        plt.ylabel('recovery_time')
-        plt.savefig('recover.png')
+        # plt.plot(recovery_times)
+        # plt.ylabel('recovery_time')
+        # plt.savefig('recover.png')
         # plt.subplot(4,2,1)
         # plt.plot(base_contact_forces,label='base_contact')
         # plt.ylabel('bese_contact_force')
@@ -251,21 +267,44 @@ def play(args):
         # plt.subplot(4,2,7)
         # plt.plot(base_jerk,label='base_jerk')
         # plt.ylabel('base_jerk')
-        # plt.subplot(4,2,2)
-        # plt.plot(tot_contact_forces,label='tot_contact')
-        # plt.ylabel('tot_contact_force')
-        # plt.subplot(4,2,4)
-        # plt.plot(tot_net_force,label='tot_net_force')
-        # plt.ylabel('tot_net_force')
-        # plt.subplot(4,2,8)
-        # plt.plot(tot_yank,label='tot_yank')
-        # plt.ylabel('tot_yank')
-        # plt.savefig('visualize.png')
+        
+        length=len(tot_contact_forces)//3
+        plt.subplot(2,2,1)
+        plt.title('ball_hit')
+        plt.plot(tot_contact_forces[:length],label='ball',alpha=0.7)
+        plt.plot(tot_contact_forces[length:2*length],label='air_init',alpha=0.7)
+        plt.plot(tot_contact_forces[2*length:3*length],label='stand',alpha=0.7)
+        plt.legend()
+        plt.ylabel('contact_force')
+        
+        plt.subplot(2,2,2)
+        plt.plot(tot_net_force[:length],label='ball',alpha=0.7)
+        plt.plot(tot_net_force[length:2*length],label='air_init',alpha=0.7)
+        plt.plot(tot_net_force[2*length:3*length],label='stand',alpha=0.7)
+        plt.legend()
+        plt.ylabel('net_force')
+        
+        plt.subplot(2,2,3)
+        plt.plot(tot_yank[:length],label='ball',alpha=0.7)
+        plt.plot(tot_yank[length:2*length],label='air_init',alpha=0.7)      
+        plt.plot(tot_yank[2*length:3*length],label='stand',alpha=0.7)      
+        plt.legend()
+        plt.ylabel('yank')
+        
+        plt.subplot(2,2,4)
+        plt.plot(tot_power[:length],label='ball',alpha=0.7)
+        plt.plot(tot_power[length:2*length],label='air_init',alpha=0.7)      
+        plt.plot(tot_power[2*length:3*length],label='stand',alpha=0.7)
+        plt.legend()
+        plt.ylabel('power')
+        
+        
+        plt.savefig('visualize_{}.png'.format(env_cfg.domain_rand.max_push_vel_xy))
         
 
 if __name__ == '__main__':
-    EXPORT_POLICY =False# True
-    RECORD_FRAMES = True
+    EXPORT_POLICY =False#True
+    RECORD_FRAMES =False#True
     MOVE_CAMERA = False
     args = get_args()
     play(args)

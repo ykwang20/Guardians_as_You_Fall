@@ -44,6 +44,7 @@ class PPO:
                  clip_param=0.2,
                  gamma=0.998,
                  lam=0.95,
+                 env=None,
                  value_loss_coef=1.0,
                  entropy_coef=0.0,
                  learning_rate=1e-3,
@@ -55,6 +56,8 @@ class PPO:
                  ):
 
         self.device = device
+        if env:
+            self.env = env
 
         self.desired_kl = desired_kl
         self.schedule = schedule
@@ -77,6 +80,18 @@ class PPO:
         self.lam = lam
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
+        if env is not None:
+        
+            self.zero_action=torch.zeros(1, env.num_actions, dtype=torch.float, device=self.device)
+            self.offset_action=torch.zeros(1, env.num_obs, dtype=torch.float, device=self.device)
+            self.offset_action[:,-40:-28]+=((env.front_dof-env.avg_dof)).unsqueeze(0)
+            
+            self.front_stand_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/for_stand/exported/policies/stand_kp20_8_21.pt').to(self.device)
+            self.back_stand_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_stand/exported/policies/back_stand_policy_from_Aug06_01-53.pt').to(self.device)
+            self.fall_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/go1_fall_back/exported/policies/fall_policy.pt').to(self.device)
+            self.back_front_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_to_forward/exported/policies/back_for_policy.pt').to(self.device)
+            self.front_back_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/forward_to_back/exported/policies/for_back_policy.pt').to(self.device)
+            self.estimator=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/estimator/exported/policies/estimator_triple.pt').to(self.device)
 
     def init_storage(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape):
         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape, self.device)
@@ -101,6 +116,33 @@ class PPO:
         self.transition.observations = obs
         self.transition.critic_observations = critic_obs
         return self.transition.actions
+    
+    def act_mode(self, obs, critic_obs, mode):
+        if self.actor_critic.is_recurrent:
+            self.transition.hidden_states = self.actor_critic.get_hidden_states()
+        # Compute the actions and values
+        env_ids=(mode.squeeze()==2).nonzero(as_tuple=False).flatten()
+        actions=torch.where(mode==0, self.front_stand_policy(obs[:,-3*self.env.num_obs:]),self.zero_action)
+        actions+=torch.where(mode==1, self.back_stand_policy(obs[:,-3*self.env.num_obs:]),self.zero_action)
+        #actions[env_ids]=self.actor_critic.act(obs[env_ids,-self.env.num_obs:]+self.offset_action)
+        actions+=torch.where(mode==2, self.actor_critic.act(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
+        actions+=torch.where(mode==3, self.back_front_policy(obs[:,-self.env.num_obs:]),self.zero_action)
+        actions+=torch.where(mode==4, self.front_back_policy(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
+        
+        
+        
+        self.transition.actions = actions[env_ids].detach()
+        self.transition.values = self.actor_critic.evaluate(critic_obs).detach()
+        
+        log_prob=self.actor_critic.get_actions_log_prob(actions)
+        self.transition.actions_log_prob = log_prob[env_ids].detach()
+        
+        self.transition.action_mean = self.actor_critic.action_mean[env_ids].detach()
+        self.transition.action_sigma = self.actor_critic.action_std[env_ids].detach()
+        # need to record obs and critic_obs before env.step()
+        self.transition.observations = obs[env_ids,-self.env.num_obs:]+self.offset_action
+        self.transition.critic_observations = critic_obs[env_ids]
+        return actions
     
     def act_high(self, obs, critic_obs):
         if self.actor_critic.is_recurrent:
@@ -140,6 +182,22 @@ class PPO:
         self.storage.add_transitions(self.transition)
         self.transition.clear()
         self.actor_critic.reset(dones)
+        
+    def process_env_step_mode(self, rewards, dones, infos, mode):
+        env_ids=(mode.squeeze()==2).nonzero(as_tuple=False).flatten()
+        zero_env_ids=(mode.squeeze()==0).nonzero(as_tuple=False).flatten()
+        self.transition.rewards = rewards[env_ids].clone()
+        self.transition.dones = dones[env_ids]
+        # Bootstrapping on time outs
+        if len(env_ids)>0:
+            if 'time_outs' in infos:
+                
+                self.transition.rewards += self.gamma * torch.squeeze(self.transition.values[env_ids] * infos['time_outs'][env_ids].unsqueeze(1).to(self.device), 1)
+
+        # Record the transition
+        self.storage.add_transitions_mode(self.transition, env_ids, zero_env_ids)
+        self.transition.clear()
+        self.actor_critic.reset(dones)
     
     def compute_returns(self, last_critic_obs):
         last_values= self.actor_critic.evaluate(last_critic_obs).detach()
@@ -156,6 +214,8 @@ class PPO:
             old_mu_batch, old_sigma_batch, hid_states_batch, masks_batch in generator:
 
 
+                if obs_batch.isnan().any():
+                    print(obs_batch)
                 self.actor_critic.act(obs_batch, masks=masks_batch, hidden_states=hid_states_batch[0])
                 actions_log_prob_batch = self.actor_critic.get_actions_log_prob(actions_batch)
                 value_batch = self.actor_critic.evaluate(critic_obs_batch, masks=masks_batch, hidden_states=hid_states_batch[1])
@@ -182,24 +242,13 @@ class PPO:
                 # Surrogate loss
                 ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
                 surrogate = -torch.squeeze(advantages_batch) * ratio
+                if surrogate.isnan().any():
+                    print('surrogate',surrogate)
                 surrogate_clipped = -torch.squeeze(advantages_batch) * torch.clamp(ratio, 1.0 - self.clip_param,
                                                                                 1.0 + self.clip_param)
                 surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
                 
-                target_mode_batch=torch.logical_or(critic_obs_batch[:,0], critic_obs_batch[:,2])
-                target_mode_batch=target_mode_batch.to(torch.int64)
-                target_one_hot = torch.zeros(6*self.num_envs, 2, device=self.device)
-                target_one_hot.scatter_(1, torch.tensor(target_mode_batch).unsqueeze(1), 1)
-                target_batch=torch.cat((target_one_hot, (critic_obs_batch)[:,3].unsqueeze(1)), dim=1)
-                
-                #print('target_batch',target_batch[0])
-                
-                raw_actions_batch=self.actor_critic.actor(obs_batch)
-                mode_batch=nn.functional.softmax(raw_actions_batch[:,:2], dim=-1)
-                mode_loss=torch.square(mode_batch-target_batch[:,:2]).mean()
-                #mode_loss=torch.square(raw_actions_batch-target_one_hot).mean()
-                #print('mode_loss',mode_batch[0])
-                height_loss=torch.square(raw_actions_batch[:,2]-target_batch[:,2]).mean()
+                           
 
                 # Value function loss
                 if self.use_clipped_value_loss:
@@ -211,8 +260,7 @@ class PPO:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                #loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
-                loss=mode_loss+height_loss#-self.entropy_coef * entropy_batch.mean()#+height_loss
+                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
 
                 # Gradient step
                 self.optimizer.zero_grad()
@@ -220,10 +268,9 @@ class PPO:
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 
-                #mean_value_loss += value_loss.item()
-                # mean_surrogate_loss += surrogate_loss.item()
-                mean_value_loss += height_loss.item()
-                mean_surrogate_loss += mode_loss.item()
+                mean_value_loss += value_loss.item()
+                mean_surrogate_loss += surrogate_loss.item()
+                
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_value_loss /= num_updates

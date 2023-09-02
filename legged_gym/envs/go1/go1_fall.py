@@ -280,10 +280,10 @@ class Go1Fall(BaseTask):
         if self.cfg.env.send_timeouts:
             self.extras["time_outs"] = self.time_out_buf
             
-        self.base_quat[env_ids] = self.root_states[env_ids, 3:7]
-        self.base_lin_vel[env_ids] = quat_rotate_inverse(self.base_quat, self.root_states[env_ids, 7:10])
-        self.base_ang_vel[env_ids] = quat_rotate_inverse(self.base_quat, self.root_states[env_ids, 10:13])
-        self.projected_gravity[env_ids] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
+        # self.base_quat[env_ids] = self.root_states[env_ids, 3:7]
+        # self.base_lin_vel[env_ids] = quat_rotate_inverse(self.base_quat, self.root_states[env_ids, 7:10])
+        # self.base_ang_vel[env_ids] = quat_rotate_inverse(self.base_quat, self.root_states[env_ids, 10:13])
+        # self.projected_gravity[env_ids] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
     
     def compute_reward(self):
         """ Compute rewards
@@ -334,12 +334,15 @@ class Go1Fall(BaseTask):
             heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements
             self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, heights), dim=-1)
 
-        # add noise if needed
-        if self.add_noise:
-            self.privileged_obs_buf += (2 * torch.rand_like(self.privileged_obs_buf) - 1) * self.noise_scale_vec
-
         self.privileged_obs_buf=torch.cat((self.contact_forces[...,2].view(self.num_envs,-1)*0.1, self.privileged_obs_buf),dim=-1)
         self.obs_buf = self.privileged_obs_buf[:, -self.num_obs:]
+        # print('dofs', self.dof_pos[0, :])
+        # print('base height', self.root_states[0, 2])
+        
+        # add noise if needed
+        if self.add_noise:
+            self.obs_buf += (2 * torch.rand_like(self.obs_buf) - 1) * self.noise_scale_vec
+        
         
 
     def get_amp_observations(self,amp_forward=["joint_pose","foot","joint_vel","z"]):
@@ -545,7 +548,7 @@ class Go1Fall(BaseTask):
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        self.dof_pos[env_ids] = self.init_dof_pos #* torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
+        self.dof_pos[env_ids] = self.init_dof_pos * torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
         self.dof_pos[env_ids,7]-=self.init_pitch_bias[env_ids].squeeze(1)
         self.dof_pos[env_ids,10]-=self.init_pitch_bias[env_ids].squeeze(1)
         self.dof_vel[env_ids] = 0#torch_rand_float(-3, 3, (len(env_ids), self.num_dof), device=self.device)
@@ -682,17 +685,17 @@ class Go1Fall(BaseTask):
         Returns:
             [torch.Tensor]: Vector of scales used to multiply a uniform distribution in [-1, 1]
         """
-        noise_vec = torch.zeros_like(self.privileged_obs_buf[0])
+        noise_vec = torch.zeros_like(self.obs_buf[0])
         self.add_noise = self.cfg.noise.add_noise
         noise_scales = self.cfg.noise.noise_scales
         noise_level = self.cfg.noise.noise_level
-        noise_vec[:3] = noise_scales.lin_vel * noise_level * self.obs_scales.lin_vel
-        noise_vec[3:6] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
-        noise_vec[6:9] = noise_scales.gravity * noise_level
-        noise_vec[9:12] = 0. # commands
-        noise_vec[12:int(12+self.cfg.env.num_actions)] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
-        noise_vec[int(12+self.cfg.env.num_actions):int(12+self.cfg.env.num_actions*2)] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
-        noise_vec[int(12+self.cfg.env.num_actions*2):int(12+self.cfg.env.num_actions*3)] = 0. # previous actions
+        noise_vec[:3] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
+        #noise_vec[3:6] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
+        noise_vec[3:6] = noise_scales.gravity * noise_level
+        #noise_vec[9:12] = 0. # commands
+        noise_vec[6:int(6+self.cfg.env.num_actions)] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
+        noise_vec[int(6+self.cfg.env.num_actions):int(6+self.cfg.env.num_actions*2)] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
+        noise_vec[int(6+self.cfg.env.num_actions*2):] = 0. # previous actions & contact filt
         if self.cfg.terrain.measure_heights:
             noise_vec[48:235] = noise_scales.height_measurements* noise_level * self.obs_scales.height_measurements
         return noise_vec

@@ -75,7 +75,7 @@ class OnPolicyRunnerBall:
                                                         self.env.num_actions,
                                                         **self.policy_cfg).to(self.device)
         alg_class = eval(self.cfg["algorithm_class_name"]) # PPO
-        self.alg: PPO = alg_class(actor_critic, device=self.device, **self.alg_cfg)
+        self.alg: PPO = alg_class(actor_critic, device=self.device, **self.alg_cfg, env=self.env)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
         self.zero_action=torch.zeros(self.env.num_envs, self.env.num_actions, dtype=torch.float, device=self.device)
@@ -126,18 +126,28 @@ class OnPolicyRunnerBall:
             with torch.inference_mode():
                 
                 for i in range(self.num_steps_per_env):
-                    while self.env.mode[0] !=2:
-                        actions=torch.where(self.env.mode==0, self.front_stand_policy(obs[:,-3*self.env.num_obs:]),self.zero_action)
-                        actions+=torch.where(self.env.mode==1, self.back_stand_policy(obs[:,-3*self.env.num_obs:]),self.zero_action)
-                        actions+=torch.where(self.env.mode==2, self.fall_policy(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
-                        actions+=torch.where(self.env.mode==3, self.back_front_policy(obs[:,-self.env.num_obs:]),self.zero_action)
-                        actions+=torch.where(self.env.mode==4, self.front_back_policy(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
-                        obs, _, _,_, _, _= self.env.step(actions)
-                    actions= self.alg.act(obs[:,-self.env.num_obs:]+self.offset_action, critic_obs)
+                    #print(torch.sum(self.env.mode==2))
+                    
+                    # while self.env.mode[0]!=2:
+                    # # #while torch.sum(self.env.mode==2)<200:
+                    #     print('!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    #     print('!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    #     print('!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    #     sys.exit()
+                    #     actions=torch.where(self.env.mode==0, self.front_stand_policy(obs[:,-3*self.env.num_obs:]),self.zero_action)
+                    #     actions+=torch.where(self.env.mode==1, self.back_stand_policy(obs[:,-3*self.env.num_obs:]),self.zero_action)
+                    #     actions+=torch.where(self.env.mode==2, self.alg.actor_critic.actor(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
+                    #     actions+=torch.where(self.env.mode==3, self.back_front_policy(obs[:,-self.env.num_obs:]),self.zero_action)
+                    #     actions+=torch.where(self.env.mode==4, self.front_back_policy(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
+                    #     obs, _, _,_, _, _= self.env.step(actions)
+                    #actions= self.alg.act(obs[:,-self.env.num_obs:]+self.offset_action, critic_obs)
+                    actions= self.alg.act_mode(obs, critic_obs,self.env.mode)
+                    mode=self.env.mode.clone()
                     obs, privileged_obs, rewards, dones, infos, _= self.env.step(actions)
                     critic_obs = privileged_obs if privileged_obs is not None else obs
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
-                    self.alg.process_env_step(rewards, dones, infos)
+                    self.alg.process_env_step_mode(rewards, dones, infos,mode)
+                    #self.alg.process_env_step(rewards, dones, infos)
                     if self.log_dir is not None:
                         # Book keeping
                         if 'episode' in infos:

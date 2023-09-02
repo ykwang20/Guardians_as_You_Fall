@@ -35,10 +35,10 @@ class Go1FallBackCfg( LeggedRobotCfg ):
 
     class env( LeggedRobotCfg.env ):
         num_envs = 5480
-        include_history_steps = 3#None  # Number of steps of history to include.#3 for stand
+        include_history_steps = None  # Number of steps of history to include.#3 for stand
         num_observations =46#46#42#48 #for stand#42
         num_privileged_obs = 66#66#48#48
-        episode_length_s =5#10.
+        episode_length_s =5#1.5#10.
         reference_state_initialization = False
         # reference_state_initialization_prob = 0.85
         # amp_motion_files = MOTION_FILES
@@ -49,9 +49,6 @@ class Go1FallBackCfg( LeggedRobotCfg ):
         rot = [0.0, -0.707107, 0.0, 0.707107] # x,y,z,w [quat]
         #rot = [0., -1.0, 0.0, 0.0] # x,y,z,w [quat]
         desired_pos = [0.0, 0.0, 0.267] # x,y,z [m]
-        ball_pos=[0.,0.,0.63]
-        ball_lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
-        ball_ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
         init_joint_angles = { # = target angles [rad] when action = 0.0
             '2_FL_hip_joint': 0.,   # [rad]
             '4_RL_hip_joint': 0.,   # [rad]
@@ -74,14 +71,14 @@ class Go1FallBackCfg( LeggedRobotCfg ):
             '1_FR_hip_joint': 0. ,  # [rad]
             '3_RR_hip_joint': 0.,   # [rad]
 
-            '2_FL_thigh_joint': 4.0416,     # [rad]
+            '2_FL_thigh_joint': 3.7,     # [rad]
             '4_RL_thigh_joint': 4.0416,   # [rad]
-            '1_FR_thigh_joint': 4.0416,     # [rad]
+            '1_FR_thigh_joint': 3.7,     # [rad]
             '3_RR_thigh_joint': 4.0416,   # [rad]
 
-            '2_FL_calf_joint': -1.8,   # [rad]
+            '2_FL_calf_joint': -1.5,   # [rad]
             '4_RL_calf_joint': -1.8,    # [rad]
-            '1_FR_calf_joint': -1.8,  # [rad]
+            '1_FR_calf_joint': -1.5,  # [rad]
             '3_RR_calf_joint': -1.8,    # [rad]
         }
         default_joint_angles={
@@ -119,13 +116,13 @@ class Go1FallBackCfg( LeggedRobotCfg ):
     
     class noise:
         #TODO: add noise to the only to the observation, not privileged observation
-        add_noise = False
+        add_noise = True
         noise_level = 1.0 # scales other values
         class noise_scales:
-            dof_pos = 0.01
+            dof_pos = 0.03
             dof_vel = 1.5
             lin_vel = 0.1
-            ang_vel = 0.2
+            ang_vel = 0.3
             gravity = 0.05
             height_measurements = 0.1
             
@@ -161,10 +158,10 @@ class Go1FallBackCfg( LeggedRobotCfg ):
     class domain_rand(LeggedRobotCfg.terrain):
         randomize_friction = True
         friction_range = [0.5, 1.25]
-        randomize_base_mass = False
+        randomize_base_mass = True
         added_mass_range = [-1., 1.]
-        push_robots = True
-        push_interval_s = 1#15
+        push_robots = False#True
+        push_interval_s = 9#15
         max_push_vel_xy = 1.
         randomize_gains = False
         stiffness_multiplier_range = [0.9, 1.1]
@@ -173,8 +170,8 @@ class Go1FallBackCfg( LeggedRobotCfg ):
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
         control_type = 'P'
-        stiffness = {'joint': 60.}  # [N*m/rad]
-        damping = {'joint': 3.}     # [N*m*s/rad]
+        stiffness = {'joint': 20.}  # [N*m/rad]
+        damping = {'joint': 0.5}     # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 1# for stand#0.25
         # decimation: Number of control action updates @ sim DT per policy DT
@@ -183,8 +180,8 @@ class Go1FallBackCfg( LeggedRobotCfg ):
     class asset( LeggedRobotCfg.asset ):
         file = '/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/go1/urdf/go1.urdf'
         ball_file= '/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/ball.urdf'
-        num_balls_row=1
-        num_balls_col=1
+        num_balls_row=0#3
+        num_balls_col=0#3
         foot_name = "foot"
         rear_foot_names=["RL_foot","RR_foot"]
         penalize_contacts_on = ["base","hip","thigh", "calf"]
@@ -194,7 +191,7 @@ class Go1FallBackCfg( LeggedRobotCfg ):
         self_collisions = 0 # 1 to disable, 0 to enable...bitwise filter
   
     class rewards( LeggedRobotCfg.rewards ):
-        soft_dof_pos_limit = 0.9
+        soft_dof_pos_limit = 0.975
         base_height_target = 0.25
         class scales( LeggedRobotCfg.rewards.scales ):
             termination = 0.0
@@ -203,17 +200,17 @@ class Go1FallBackCfg( LeggedRobotCfg ):
             lin_vel_z =0# -1
             ang_vel_xy = 0.0
             orientation = 0.0
-            torques = 0#-1e-5#-4e-7#-1e-5#-4e-7 #-0.00005 for stand
+            torques = -1e-5#-4e-7#-1e-5#-4e-7 #-0.00005 for stand
             dof_vel =0  #-0.15 for stand
             dof_acc =0  #-2.5e-7 for stand
             base_height = 0.0 
             feet_air_time =  0.0
             feet_stumble = 0.0 
             action_rate_exp =0  #0.3for stand
-            action_rate=-2.5e-3#-5e-4#-0.005for stand
+            action_rate=-5e-3#-2.5e-3#-5e-4#-0.005for stand
             hip_pos=0#-0.1
             stand_still = 0.0
-            dof_pos_limits = 0.0
+            dof_pos_limits = -10
             upright=0 #1.0 for stand
             max_height=0 #1.0for stand
             work=0#-0.003
@@ -228,9 +225,9 @@ class Go1FallBackCfg( LeggedRobotCfg ):
             foot_height=1#0.5#1
             action=0#-1e-3
             recovery=0#100
-            collision=0#-5e-6#-1e-5#-5e-4#-0.001#-5e-4
-            net_force=0#-5e-5#-5e-4
-            yank=0#-1.25e-6#-1.25e-5#-1.25e-4#-1.25e-5
+            collision=-5e-5#-1e-5#-5e-4#-0.001#-5e-4
+            net_force=-5e-5#-5e-4
+            yank=-1.25e-5#-1.25e-5#-1.25e-4#-1.25e-5
             
         only_positive_rewards = False#True # if true negative total rewards are clipped at zero (avoids early termination problems)
 

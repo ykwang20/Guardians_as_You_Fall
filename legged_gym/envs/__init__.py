@@ -47,6 +47,10 @@ from .go1.estimator import Go1Estimator
 from .go1.estimator_config import EstimatorCfg, EstimatorCfgPPO
 from .go1.ball import Go1Ball
 from .go1.ball_config import BallCfg, BallCfgPPO
+from .go1.pit import Go1Pit
+from .go1.pit_config import PitCfg, PitCfgPPO
+from .go1.curr import Go1Curr
+from .go1.curr_config import CurrCfg, CurrCfgPPO
 
 
 import os
@@ -62,5 +66,6 @@ task_registry.register( "selector", Go1Selector, SelectorCfg(), SelectorCfgPPO()
 task_registry.register( "detector", Go1Detector, DetectorCfg(), DetectorCfgPPO() )
 task_registry.register( "estimator", Go1Estimator, EstimatorCfg(), EstimatorCfgPPO() )
 task_registry.register( "ball", Go1Ball, BallCfg(), BallCfgPPO() )
-
+task_registry.register( "pit", Go1Pit, PitCfg(), PitCfgPPO() )
+task_registry.register( "curr", Go1Curr, CurrCfg(), CurrCfgPPO() )
 

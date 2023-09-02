@@ -121,6 +121,8 @@ class ActorCritic(nn.Module):
 
     def update_distribution(self, observations):
         mean = self.actor(observations)
+        if mean.isnan().any():
+            print(observations)
         std = self.std.to(mean.device)
         self.distribution = Normal(mean, mean*0. + std)
 

@@ -121,10 +121,10 @@ class DetectorCfg( LeggedRobotCfg ):
         add_noise = False
         noise_level = 1.0 # scales other values
         class noise_scales:
-            dof_pos = 0.01
+            dof_pos = 0.03
             dof_vel = 1.5
             lin_vel = 0.1
-            ang_vel = 0.2
+            ang_vel = 0.3
             gravity = 0.05
             height_measurements = 0.1
             
@@ -194,7 +194,7 @@ class DetectorCfg( LeggedRobotCfg ):
         self_collisions = 1 # 1 to disable, 0 to enable...bitwise filter
   
     class rewards( LeggedRobotCfg.rewards ):
-        soft_dof_pos_limit = 0.9
+        soft_dof_pos_limit = 0.975
         base_height_target = 0.25
         class scales( LeggedRobotCfg.rewards.scales ):
             termination = 0.0

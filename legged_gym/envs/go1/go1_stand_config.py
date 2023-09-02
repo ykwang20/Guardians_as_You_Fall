@@ -43,7 +43,7 @@ class Go1StandCfg( LeggedRobotCfg ):
         # amp_motion_files = MOTION_FILES
 
     class init_state( LeggedRobotCfg.init_state ):
-        pos = [0.0, 0.0, 0.268] # x,y,z [m]
+        pos = [0.0, 0.0, 0.278] # x,y,z [m]
         rot = [0., -1.0, 0.0, 0.0] # x,y,z,w [quat]
         #rot = [0., 0., 0.0, 1.0] # x,y,z,w [quat]
         default_joint_angles = { # = target angles [rad] when action = 0.0
@@ -100,14 +100,14 @@ class Go1StandCfg( LeggedRobotCfg ):
             '1_FR_hip_joint': 0. ,  # [rad]
             '3_RR_hip_joint': 0.,   # [rad]
 
-            '2_FL_thigh_joint': 4.0416,     # [rad]
-            '4_RL_thigh_joint': 4.0416,   # [rad]
-            '1_FR_thigh_joint': 4.0416,     # [rad]
-            '3_RR_thigh_joint': 4.0416,   # [rad]
+            '2_FL_thigh_joint': 3.7,     # [rad]
+            '4_RL_thigh_joint': 4.04,   # [rad]
+            '1_FR_thigh_joint': 3.7,     # [rad]
+            '3_RR_thigh_joint': 4.04,   # [rad]
 
-            '2_FL_calf_joint': -1.8,   # [rad]
+            '2_FL_calf_joint': -1.5,   # [rad]
             '4_RL_calf_joint': -1.8,    # [rad]
-            '1_FR_calf_joint': -1.8,  # [rad]
+            '1_FR_calf_joint': -1.5,  # [rad]
             '3_RR_calf_joint': -1.8,    # [rad]
         }
     
@@ -115,10 +115,10 @@ class Go1StandCfg( LeggedRobotCfg ):
         add_noise = True#False
         noise_level = 1.0 # scales other values
         class noise_scales:
-            dof_pos = 0.01
+            dof_pos = 0.03
             dof_vel = 1.5
             lin_vel = 0.1
-            ang_vel = 0.2
+            ang_vel = 0.3
             gravity = 0.05
             height_measurements = 0.1
             
@@ -187,7 +187,7 @@ class Go1StandCfg( LeggedRobotCfg ):
         self_collisions = 0 # 1 to disable, 0 to enable...bitwise filter
   
     class rewards( LeggedRobotCfg.rewards ):
-        soft_dof_pos_limit = 0.9
+        soft_dof_pos_limit = 0.975
         base_height_target = 0.25
         class scales( LeggedRobotCfg.rewards.scales ):
             termination = 0.0
