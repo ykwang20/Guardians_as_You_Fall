@@ -160,7 +160,7 @@ class CurrCfg( LeggedRobotCfg ):
         # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete, stepping stone, gap, pit, plane]
         terrain_proportions = [0., 0., 0., 0., 0., 0., 0., 0., 1.] # proportions of terrain types
         #task_proportions = [0.2,0.15,0.15,0.5] #pit, stand_strike, crouch_strike, initialize_fall
-        task_proportions = [0.,0.,0.,1.] #pit, stand_strike, crouch_strike, initialize_fall
+        task_proportions = [0.,0.,0.5,0.5] #pit, stand_strike, crouch_strike, initialize_fall
         
     class sim(LeggedRobotCfg.sim):
         dt =  0.005
@@ -176,9 +176,9 @@ class CurrCfg( LeggedRobotCfg ):
         randomize_base_mass = True
         added_mass_range = [-1., 1.]
         push_robots = True
-        push_interval_s = 1#15
-        reset_ball_interval_s = 1.2
-        max_push_vel_xy = 5.
+        push_interval_s = 1
+        reset_ball_interval_s = 1.4#1.2
+        max_push_vel_xy = 5
         max_push_ang=4.
         randomize_gains = True
         stiffness_multiplier_range = [0.9, 1.1]
@@ -227,7 +227,7 @@ class CurrCfg( LeggedRobotCfg ):
             feet_air_time =  0.0
             feet_stumble = 0.0 
             action_rate_exp =0  #0.3for stand
-            action_rate=-5e-3#-2.5e-3#-5e-4#-0.005for stand
+            action_rate=-5.e-3#-5e-4#-0.005for stand
             hip_pos=0#-0.1
             stand_still = 0.0
             dof_pos_limits = -10
@@ -266,14 +266,13 @@ class CurrCfgPPO( LeggedRobotCfgPPO ):
         entropy_coef = 0.01
     class runner( LeggedRobotCfgPPO.runner ):
         policy_class_name = 'ActorCritic'
-        max_iterations = 25000 # number of policy updates
+        max_iterations = 10000 # number of policy updates
         run_name = ''
         experiment_name = 'curr'
         save_interval = 200
         load_stand_policy='/home/yikai/AMP_for_hardware/logs/go1_stand/Jul18_08-29-52_/model_300.pt'
-        load_run='/home/yikai/Fall_Recovery_control/logs/ball/Aug27_17-36-43_'
+        load_run='/home/yikai/Fall_Recovery_control/logs/curr/Sep03_03-09-37_'
         #checkpoint=1600
-        #checkpoint = 2800
-        resume = False#True
-
+        checkpoint = 2800
+        resume = False
   

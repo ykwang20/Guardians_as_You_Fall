@@ -115,7 +115,8 @@ def play(args):
     video=None
     img_idx=0
     low_filter=None
-    for i in range(int(4*env.max_episode_length)):
+    #for i in range(int(4*env.max_episode_length)):
+    for i in range(1200):
         actions = policy(obs.detach())
         print('actions',actions[0])
         # if i==0:

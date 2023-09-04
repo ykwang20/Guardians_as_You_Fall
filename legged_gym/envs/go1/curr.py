@@ -94,7 +94,7 @@ class Go1Curr(BaseTask):
     def reset(self):
         """ Reset all robots"""
         #self.foot_pos=self.foot_positions_in_base_frame(self.dof_pos).to(self.device)
-        self.reset_idx(torch.arange(self.num_envs, device=self.device), torch.tensor([],device=self.device), torch.tensor([],device=self.device), torch.tensor([],device=self.device))
+        self.reset_idx(torch.arange(self.num_envs, device=self.device), torch.tensor([],device=self.device), torch.tensor([],device=self.device), torch.tensor([],device=self.device,dtype=torch.int64))
         if self.cfg.env.include_history_steps is not None:
             self.obs_buf_history.reset(
                 torch.arange(self.num_envs, device=self.device),
@@ -203,7 +203,7 @@ class Go1Curr(BaseTask):
         self.rigid_jerk=torch.where(self.episode_length_buf.unsqueeze(1).unsqueeze(2)<3,torch.zeros_like(rigid_jerk),rigid_jerk)
         
         self.check_ball_contact() # put before strike ball
-        pit_env_ids, strike_env_ids,init_angle_env_ids=self._post_physics_step_callback()
+        pit_env_ids, strike_env_ids=self._post_physics_step_callback()
         
         self.compute_reward()
         
@@ -216,18 +216,18 @@ class Go1Curr(BaseTask):
         # compute observations, rewards, resets, ...
         self.check_termination()
         
-        env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
+        env_ids = self.reset_buf[:self.crcstrike_end].nonzero(as_tuple=False).flatten()
+        init_angle_env_ids =self.crcstrike_end+self.reset_buf[self.crcstrike_end:].nonzero(as_tuple=False).flatten()
         #terminal_amp_states = self.get_amp_observations()[env_ids]
         
-            
+        self.init_angle(init_angle_env_ids)    
         self.reset_idx(env_ids, pit_env_ids, strike_env_ids, init_angle_env_ids)
         self.compute_observations() # in some cases a simulation step might be required to refresh some obs (for example body positions)
 
 
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
             self._draw_debug_vis()
-
-        return env_ids
+        return torch.cat((env_ids,init_angle_env_ids))
 
     def check_termination(self):
         """ Check if environments need to be reset
@@ -239,7 +239,6 @@ class Go1Curr(BaseTask):
         #TODO:
         #self.recovered_buf = torch.logical_and(self.recovered_buf , torch.exp(-10*torch.sum(torch.square(self.feet_pos[:,2]),dim=1))>0.2)
         self.reset_buf |= self.time_out_buf
-        #print('episode_length_buf:',self.episode_length_buf[0])
         #self.reset_buf |= self.recovered_buf#TODO: remove this line
         
     def check_ball_contact(self):
@@ -267,12 +266,13 @@ class Go1Curr(BaseTask):
         if len(env_ids)+len(pit_env_ids)+len(strike_env_ids)+len(init_angle_env_ids)+len(reset_ball_ids)==0:
             return
         # update curriculum
+        all_to_reset=torch.cat((env_ids,init_angle_env_ids))
         
         if self.cfg.terrain.curriculum:
-            self._update_terrain_curriculum(env_ids)
+            self._update_terrain_curriculum(all_to_reset)
         # avoid updating command curriculum at each step since the maximum command is common to all envs
         if self.cfg.commands.curriculum and (self.common_step_counter % self.max_episode_length==0):
-            self.update_command_curriculum(env_ids)
+            self.update_command_curriculum(all_to_reset)
         
         # reset robot states
         
@@ -281,34 +281,34 @@ class Go1Curr(BaseTask):
         self._reset_root_states(env_ids,pit_env_ids, strike_env_ids, init_angle_env_ids,reset_ball_ids)
         
         
-        if len(env_ids)==0:
+        if len(all_to_reset)==0:
             return     
 
-        self._resample_commands(env_ids)
+        self._resample_commands(all_to_reset)
         # if self.cfg.commands.manip:
         #     self.resample_manip_commands(env_ids)
 
         if self.cfg.domain_rand.randomize_gains:
-            new_randomized_gains = self.compute_randomized_gains(len(env_ids))
-            self.randomized_p_gains[env_ids] = new_randomized_gains[0]
-            self.randomized_d_gains[env_ids] = new_randomized_gains[1]
+            new_randomized_gains = self.compute_randomized_gains(len(all_to_reset))
+            self.randomized_p_gains[all_to_reset] = new_randomized_gains[0]
+            self.randomized_d_gains[all_to_reset] = new_randomized_gains[1]
 
         # reset buffers
-        self.last_actions[env_ids] = 0.
-        self.last_dof_vel[env_ids] = 0.
-        self.last_rigid_lin_vel[env_ids] = 0.
-        self.last_rigid_acc[env_ids] = 0.
-        self.feet_air_time[env_ids] = 0.
-        self.episode_length_buf[env_ids] = 0
-        self.reset_buf[env_ids] = 1
-        self.pushed_buf[env_ids] = 0
-        self.mode[env_ids]= 0
+        self.last_actions[all_to_reset] = 0.
+        self.last_dof_vel[all_to_reset] = 0.
+        self.last_rigid_lin_vel[all_to_reset] = 0.
+        self.last_rigid_acc[all_to_reset] = 0.
+        self.feet_air_time[all_to_reset] = 0.
+        self.episode_length_buf[all_to_reset] = 0
+        self.reset_buf[all_to_reset] = 1
+        self.pushed_buf[all_to_reset] = 0
+        self.mode[all_to_reset]= 0
         self.mode[self.stdstrike_end:]=2
         # fill extras
         self.extras["episode"] = {}
         for key in self.episode_sums.keys():
-            self.extras["episode"]['rew_' + key] = torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
-            self.episode_sums[key][env_ids] = 0.
+            self.extras["episode"]['rew_' + key] = torch.mean(self.episode_sums[key][all_to_reset]) / self.max_episode_length_s
+            self.episode_sums[key][all_to_reset] = 0.
         # log additional curriculum info
         if self.cfg.terrain.curriculum:
             self.extras["episode"]["terrain_level"] = torch.mean(self.terrain_levels.float())
@@ -461,28 +461,37 @@ class Go1Curr(BaseTask):
         
     def strike_ball(self,env_ids):
         
-        
         if len(env_ids)==0:
             return 
         
-        #ball_vel_xy = torch_rand_float(-self.max_ball_vel, self.max_ball_vel, (len(env_ids), 2), device=self.device)
-        ball_ang_vel = torch_rand_float(-3, 3, (len(env_ids), 3), device=self.device)
+        #ball_ang_vel = torch_rand_float(-2, 2, (len(env_ids), 3), device=self.device)
         vel=self.cfg.domain_rand.max_push_vel_xy
-        if torch.rand(1)>0.5:
-            ball_vel_xy = torch_rand_float(-vel, -1, (len(env_ids), 2), device=self.device)
+        ball_vel_xy=torch.zeros_like(self.root_states[env_ids, :2])
+        term=torch.rand(1)
+        if term<0.25:
+            ball_vel_xy[:,0] = torch_rand_float(-vel, -1, (len(env_ids), 1), device=self.device).squeeze()
+            ball_vel_xy[:,1] = torch_rand_float(-vel, -1, (len(env_ids), 1), device=self.device).squeeze()
+        elif term<0.5:
+            ball_vel_xy[:,0] = torch_rand_float(-vel, -1, (len(env_ids), 1), device=self.device).squeeze()
+            ball_vel_xy[:,1] = torch_rand_float(1, vel, (len(env_ids), 1), device=self.device).squeeze()
+        elif term<0.75:
+            ball_vel_xy[:,0] = torch_rand_float(1, vel, (len(env_ids), 1), device=self.device).squeeze()
+            ball_vel_xy[:,1] = torch_rand_float(1, vel, (len(env_ids), 1), device=self.device).squeeze()
         else:
-            ball_vel_xy = torch_rand_float(1, vel, (len(env_ids), 2), device=self.device)
-        flying_time = 0.04#0.2
+            ball_vel_xy[:,0] = torch_rand_float(1, vel, (len(env_ids), 1), device=self.device).squeeze()
+            ball_vel_xy[:,1] = torch_rand_float(-vel, -1, (len(env_ids), 1), device=self.device).squeeze()
+        
+        flying_time = 0.2#0.04#0.2
         descending = 9.8/2*flying_time**2
         
         ball_init_pos_xy = self.root_states[env_ids, :2] - ball_vel_xy * flying_time
         
-        
         self.ball_states[env_ids,:2] = ball_init_pos_xy
         self.ball_states[env_ids,2] = self.root_states[env_ids,2]+descending+(torch_rand_float(-0.1,0.25,(len(env_ids),1),device=self.device)).squeeze()
+        self.ball_states[env_ids,2]=torch.where(env_ids>self.stdstrike_end,self.root_states[env_ids,2],self.ball_states[env_ids,2])
         self.ball_states[env_ids,7:9] = ball_vel_xy
         self.ball_states[env_ids,9] = 0
-        self.ball_states[env_ids,10:13] = ball_ang_vel
+        self.ball_states[env_ids,10:13] = 0# ball_ang_vel
         
         # env_ids_int32_ball = (1+self.balls_per_env)*env_ids.to(dtype=torch.int32) + 1
         # id_in_all=(1+self.balls_per_env)*env_ids
@@ -495,11 +504,15 @@ class Go1Curr(BaseTask):
         if self.custom_origins:
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
+            self.ball_states[env_ids] = self.base_init_ball_state
+            self.ball_states[env_ids, :3] = self.root_states[env_ids, :3]+torch.tensor([2,0,0], device=self.device)
             #self.root_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=self.device) # xy position within 1m of the center
 
         else:
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
+            self.ball_states[env_ids] = self.base_init_ball_state
+            self.ball_states[env_ids, :3] = self.root_states[env_ids, :3]+torch.tensor([2,0,0], device=self.device)
             
         self.init_pitch_bias[env_ids]=torch_rand_float(-1.2, 1.2, (len(env_ids), 1), device=self.device)
         pitch=-torch.pi/2+self.init_pitch_bias[env_ids]
@@ -509,8 +522,9 @@ class Go1Curr(BaseTask):
         
         v_forward=quat_rotate(self.root_states[:,3:7],self.forward_vec)
         
-        self.root_states[env_ids,2]=v_forward[env_ids,2]*0.55+torch_rand_float(-0.05,0.15,(len(env_ids),1),device=self.device).squeeze()
-        self.dof_pos[env_ids]*=torch_rand_float(0.5, 1.5, (len(env_ids), 12), device=self.device)
+        self.root_states[env_ids,2]=0.6*v_forward[env_ids,2]+torch_rand_float(0.,0.15,(len(env_ids),1),device=self.device).squeeze()
+        self.dof_pos[env_ids] = self.avg_dof * torch_rand_float(0.5, 1.5, (len(env_ids), self.num_dof), device=self.device)
+        self.dof_vel[env_ids] = 0
         
         env_ids_int32 = (1+self.balls_per_env)*env_ids.to(dtype=torch.int32)
         # self.gym.set_actor_root_state_tensor_indexed(self.sim,
@@ -540,6 +554,21 @@ class Go1Curr(BaseTask):
                 # prepare friction randomization
                 friction_range = self.cfg.domain_rand.friction_range
                 num_buckets = 64
+                bucket_ids = torch.randint(0, num_buckets, (self.num_envs, 1))
+                friction_buckets = torch_rand_float(friction_range[0], friction_range[1], (num_buckets,1), device='cpu')
+                self.friction_coeffs = friction_buckets[bucket_ids]
+
+            for s in range(len(props)):
+                props[s].friction = self.friction_coeffs[env_id]
+        return props
+    
+    def _process_rigid_shape_props_ball(self, props, env_id):
+        
+        if self.cfg.domain_rand.randomize_friction:
+            if env_id==0:
+                # prepare friction randomization
+                friction_range = [0.01,0.1]
+                num_buckets = 10
                 bucket_ids = torch.randint(0, num_buckets, (self.num_envs, 1))
                 friction_buckets = torch_rand_float(friction_range[0], friction_range[1], (num_buckets,1), device='cpu')
                 self.friction_coeffs = friction_buckets[bucket_ids]
@@ -616,15 +645,15 @@ class Go1Curr(BaseTask):
         pushed_env_ids=push.nonzero(as_tuple=False).flatten()
         pit_env_ids=push[:self.pit_end].nonzero(as_tuple=False).flatten()
         strike_env_ids= self.pit_end+push[self.pit_end:self.crcstrike_end].nonzero(as_tuple=False).flatten()
-        init_env_ids= self.crcstrike_end+push[self.crcstrike_end:].nonzero(as_tuple=False).flatten()
+        #init_env_ids= self.crcstrike_end+push[self.crcstrike_end:].nonzero(as_tuple=False).flatten()
         
         
         if self.cfg.domain_rand.push_robots:
             self.move_pit(pit_env_ids)
             self.strike_ball(strike_env_ids)
-            self.init_angle(init_env_ids)
+            #self.init_angle(init_env_ids)
             self.pushed_buf[pushed_env_ids] = 1
-        return pit_env_ids, strike_env_ids,init_env_ids
+        return pit_env_ids, strike_env_ids#,init_env_ids
 
 
 
@@ -678,8 +707,15 @@ class Go1Curr(BaseTask):
         #     p_gains = self.p_gains
         #     d_gains = self.d_gains
  
+        if self.cfg.domain_rand.randomize_gains:
+            kp=self.kp*self.p_mult
+            kd=self.kd*self.d_mult
+        else:
+            kp=self.kp
+            kd=self.kd
+            
         if control_type=="P":
-            torques = self.kp*(actions_scaled - self.dof_pos) - self.kd*self.dof_vel
+            torques = kp*(actions_scaled - self.dof_pos) - kd*self.dof_vel
         elif control_type=="T":
             torques = actions_scaled
         else:
@@ -697,10 +733,11 @@ class Go1Curr(BaseTask):
         if len(env_ids)+len(init_angle_env_ids)==0:
             return
         mid=int((self.stdstrike_end+self.crcstrike_end)//2)
-        self.dof_pos[env_ids] = self.front_dof * torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
+        self.dof_pos[env_ids] = self.front_dof# * torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
         self.dof_vel[env_ids] = 0#torch_rand_float(-3, 3, (len(env_ids), self.num_dof), device=self.device)
         cond=torch.logical_and(env_ids>mid,env_ids<self.crcstrike_end)
-        self.dof_pos[env_ids] = torch.where(cond.unsqueeze(1),self.back_dof * torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof),device=self.device),self.dof_pos[env_ids] )
+        self.dof_pos[env_ids] = torch.where(cond.unsqueeze(1),self.back_dof * torch_rand_float(1., 1., (len(env_ids), self.num_dof),device=self.device),self.dof_pos[env_ids])
+        #self.dof_pos[env_ids] = torch.where((env_ids<self.stdstrike_end).unsqueeze(1),self.stand_dof ,self.dof_pos[env_ids])
         
         root_env_ids=torch.unique(torch.cat((env_ids,init_angle_env_ids)))
         env_ids = (1+self.balls_per_env)*root_env_ids
@@ -755,6 +792,12 @@ class Go1Curr(BaseTask):
             self.ball_states[ball_ids] = self.base_init_ball_state
             self.ball_states[ball_ids, :3] = self.root_states[ball_ids, :3]+torch.tensor([2,0,0], device=self.device)
             
+        mid=int((self.stdstrike_end+self.crcstrike_end)//2)
+        cond=torch.logical_and(env_ids>mid,env_ids<self.crcstrike_end)
+        
+        self.root_states[env_ids,3:7] = torch.where(cond.unsqueeze(1),self.back_quat,self.root_states[env_ids,3:7] )
+        #self.root_states[env_ids,3:7] = torch.where((env_ids<self.stdstrike_end).unsqueeze(1),self.stand_quat,self.root_states[env_ids,3:7])
+        #self.root_states[env_ids,2]=torch.where(env_ids<self.stdstrike_end,0.55*torch.ones_like(self.root_states[env_ids,2]),self.root_states[env_ids,2])
         
         
         root_env_ids=torch.unique(torch.cat((env_ids,pit_env_ids,init_angle_env_ids)))
@@ -982,6 +1025,8 @@ class Go1Curr(BaseTask):
 
 
         if self.cfg.domain_rand.randomize_gains:
+            self.p_mult=torch_rand_float(self.cfg.domain_rand.stiffness_multiplier_range[0], self.cfg.domain_rand.stiffness_multiplier_range[1], (self.num_envs, self.num_actions), device=self.device)
+            self.d_mult=torch_rand_float(self.cfg.domain_rand.damping_multiplier_range[0], self.cfg.domain_rand.damping_multiplier_range[1], (self.num_envs, self.num_actions), device=self.device)
             self.randomized_p_gains, self.randomized_d_gains = self.compute_randomized_gains(self.num_envs)
 
     def compute_randomized_gains(self, num_envs):
@@ -1155,6 +1200,8 @@ class Go1Curr(BaseTask):
 
         base_init_state_list = self.cfg.init_state.pos + self.cfg.init_state.rot + self.cfg.init_state.lin_vel + self.cfg.init_state.ang_vel
         self.base_init_state = to_torch(base_init_state_list, device=self.device, requires_grad=False)
+        self.back_quat=to_torch([0., -1.0, 0.0, 0.0],device=self.device, requires_grad=False)
+        self.stand_quat=to_torch([[0.0, -0.707107, 0.0, 0.707107]],device=self.device, requires_grad=False)
         base_init_ball_state_list=self.cfg.init_state.ball_pos+[0,0,0,1]+self.cfg.init_state.ball_lin_vel+self.cfg.init_state.ball_ang_vel
         self.base_init_ball_state=to_torch(base_init_ball_state_list,device=self.device,requires_grad=False)
         desired_base_pos=self.cfg.init_state.desired_pos
@@ -1200,6 +1247,8 @@ class Go1Curr(BaseTask):
                     pos=self.env_origins[i].clone()
                     pos[2]+=0.6
                     ball_pose.p=gymapi.Vec3(*pos)
+                    ball_shape_props = self._process_rigid_shape_props(rigid_shape_props_asset, i)
+                    self.gym.set_asset_rigid_shape_properties(robot_asset, ball_shape_props)
                     ball_handle=self.gym.create_actor(env_handle, ball_asset, ball_pose, "ball", i, self.cfg.asset.self_collisions, 0)
                     body_props = self.gym.get_actor_rigid_body_properties(env_handle, ball_handle)
                     body_props = self._process_rigid_body_props(body_props, i)

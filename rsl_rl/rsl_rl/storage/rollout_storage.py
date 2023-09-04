@@ -121,16 +121,16 @@ class RolloutStorage:
             self._save_hidden_states(transition.hidden_states)
         
         
-            ids=torch.randint(len(env_ids),size=(len(zero_env_ids),))
-            self.observations[self.step,zero_env_ids]=self.observations[self.step,env_ids[ids]]
-            self.privileged_observations[self.step,zero_env_ids]=self.privileged_observations[self.step,env_ids[ids]]
-            self.actions[self.step,zero_env_ids]=self.actions[self.step,env_ids[ids]]
-            self.rewards[self.step,zero_env_ids]=self.rewards[self.step,env_ids[ids]]
-            self.dones[self.step,zero_env_ids]=self.dones[self.step,env_ids[ids]]
-            self.values[self.step,zero_env_ids]=self.values[self.step,env_ids[ids]]
-            self.actions_log_prob[self.step,zero_env_ids]=self.actions_log_prob[self.step,env_ids[ids]]
-            self.mu[self.step,zero_env_ids]=self.mu[self.step,env_ids[ids]]
-            self.sigma[self.step,zero_env_ids]=self.sigma[self.step,env_ids[ids]]
+            # ids=torch.randint(len(env_ids),size=(len(zero_env_ids),))
+            # self.observations[self.step,zero_env_ids]=self.observations[self.step,env_ids[ids]]
+            # self.privileged_observations[self.step,zero_env_ids]=self.privileged_observations[self.step,env_ids[ids]]
+            # self.actions[self.step,zero_env_ids]=self.actions[self.step,env_ids[ids]]
+            # self.rewards[self.step,zero_env_ids]=self.rewards[self.step,env_ids[ids]]
+            # self.dones[self.step,zero_env_ids]=self.dones[self.step,env_ids[ids]]
+            # self.values[self.step,zero_env_ids]=self.values[self.step,env_ids[ids]]
+            # self.actions_log_prob[self.step,zero_env_ids]=self.actions_log_prob[self.step,env_ids[ids]]
+            # self.mu[self.step,zero_env_ids]=self.mu[self.step,env_ids[ids]]
+            # self.sigma[self.step,zero_env_ids]=self.sigma[self.step,env_ids[ids]]
         
         
         

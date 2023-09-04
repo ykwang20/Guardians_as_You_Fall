@@ -200,7 +200,7 @@ class Go1FallBackCfg( LeggedRobotCfg ):
             lin_vel_z =0# -1
             ang_vel_xy = 0.0
             orientation = 0.0
-            torques = -1e-5#-4e-7#-1e-5#-4e-7 #-0.00005 for stand
+            torques = -1e-6#-1e-5#-4e-7#-1e-5#-4e-7 #-0.00005 for stand
             dof_vel =0  #-0.15 for stand
             dof_acc =0  #-2.5e-7 for stand
             base_height = 0.0 
@@ -226,7 +226,7 @@ class Go1FallBackCfg( LeggedRobotCfg ):
             action=0#-1e-3
             recovery=0#100
             collision=-5e-5#-1e-5#-5e-4#-0.001#-5e-4
-            net_force=-5e-5#-5e-4
+            net_force=0#-5e-5#-5e-4
             yank=-1.25e-5#-1.25e-5#-1.25e-4#-1.25e-5
             
         only_positive_rewards = False#True # if true negative total rewards are clipped at zero (avoids early termination problems)

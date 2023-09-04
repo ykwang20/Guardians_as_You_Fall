@@ -51,6 +51,8 @@ from .go1.pit import Go1Pit
 from .go1.pit_config import PitCfg, PitCfgPPO
 from .go1.curr import Go1Curr
 from .go1.curr_config import CurrCfg, CurrCfgPPO
+from .go1.height import Go1Height
+from .go1.height_config import HeightCfg, HeightCfgPPO
 
 
 import os
@@ -68,4 +70,5 @@ task_registry.register( "estimator", Go1Estimator, EstimatorCfg(), EstimatorCfgP
 task_registry.register( "ball", Go1Ball, BallCfg(), BallCfgPPO() )
 task_registry.register( "pit", Go1Pit, PitCfg(), PitCfgPPO() )
 task_registry.register( "curr", Go1Curr, CurrCfg(), CurrCfgPPO() )
+task_registry.register( "height", Go1Height, HeightCfg(), HeightCfgPPO() )
 

@@ -50,11 +50,12 @@ def play(args):
     #env_cfg.terrain.num_cols = 20
     #env_cfg.terrain.mesh_type='plane'
     env_cfg.terrain.curriculum = False
+    env_cfg.terrain.task_proportions = [0.,1.,0.,0.]
     env_cfg.noise.add_noise = False#True
     env_cfg.domain_rand.randomize_friction = True
     env_cfg.domain_rand.push_robots = True
     env_cfg.asset.file='/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/go1/urdf/go1_arrow.urdf'
-    env_cfg.domain_rand.max_push_vel_xy=4
+    env_cfg.domain_rand.max_push_vel_xy=5
     print(LEGGED_GYM_ROOT_DIR)
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
@@ -77,10 +78,10 @@ def play(args):
 
         print('Exported policy as jit script to: ', path)
 
-    
+        
 
     logger = Logger(env.dt)
-    robot_index = 0 # which robot is used for logging
+    robot_index = 5000 # which robot is used for logging
     joint_index = 1 # which joint is used for logging
     stop_state_log = 100 # number of steps before plotting states
     stop_rew_log = env.max_episode_length + 1 # number of steps before print average episode rewards
@@ -134,9 +135,9 @@ def play(args):
     #policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/curr/exported/policies/8_31_init_angle.pt').to(env.device)
 
     with torch.no_grad():
-        for i in range(int(12*env.max_episode_length)):
+        for i in range(int(8*env.max_episode_length)):
             if i==4*env.max_episode_length:
-                policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/curr/exported/policies/8_31_init_angle.pt').to(env.device)
+                policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/ball/exported/policies/8_27_ball_new.pt').to(env.device)
                 env.reset()
             
             env.high_cmd[0,:]=0
@@ -268,43 +269,43 @@ def play(args):
         # plt.plot(base_jerk,label='base_jerk')
         # plt.ylabel('base_jerk')
         
-        length=len(tot_contact_forces)//3
+        length=len(tot_contact_forces)//2
         plt.subplot(2,2,1)
         plt.title('ball_hit')
-        plt.plot(tot_contact_forces[:length],label='ball',alpha=0.7)
-        plt.plot(tot_contact_forces[length:2*length],label='air_init',alpha=0.7)
-        plt.plot(tot_contact_forces[2*length:3*length],label='stand',alpha=0.7)
+        plt.plot(tot_contact_forces[:length],label='vel',alpha=0.7)
+        plt.plot(tot_contact_forces[length:2*length],label='ball',alpha=0.7)
+        #plt.plot(tot_contact_forces[2*length:3*length],label='stand',alpha=0.7)
         plt.legend()
         plt.ylabel('contact_force')
         
         plt.subplot(2,2,2)
-        plt.plot(tot_net_force[:length],label='ball',alpha=0.7)
-        plt.plot(tot_net_force[length:2*length],label='air_init',alpha=0.7)
-        plt.plot(tot_net_force[2*length:3*length],label='stand',alpha=0.7)
+        plt.plot(tot_net_force[:length],label='vel',alpha=0.7)
+        plt.plot(tot_net_force[length:2*length],label='ball',alpha=0.7)
+        #plt.plot(tot_net_force[2*length:3*length],label='stand',alpha=0.7)
         plt.legend()
         plt.ylabel('net_force')
         
         plt.subplot(2,2,3)
-        plt.plot(tot_yank[:length],label='ball',alpha=0.7)
-        plt.plot(tot_yank[length:2*length],label='air_init',alpha=0.7)      
-        plt.plot(tot_yank[2*length:3*length],label='stand',alpha=0.7)      
+        plt.plot(tot_yank[:length],label='vel',alpha=0.7)
+        plt.plot(tot_yank[length:2*length],label='ball',alpha=0.7)      
+        #plt.plot(tot_yank[2*length:3*length],label='stand',alpha=0.7)      
         plt.legend()
         plt.ylabel('yank')
         
         plt.subplot(2,2,4)
-        plt.plot(tot_power[:length],label='ball',alpha=0.7)
-        plt.plot(tot_power[length:2*length],label='air_init',alpha=0.7)      
-        plt.plot(tot_power[2*length:3*length],label='stand',alpha=0.7)
+        plt.plot(tot_power[:length],label='vel',alpha=0.7)
+        plt.plot(tot_power[length:2*length],label='ball',alpha=0.7)      
+        #plt.plot(tot_power[2*length:3*length],label='stand',alpha=0.7)
         plt.legend()
         plt.ylabel('power')
         
         
-        plt.savefig('visualize_{}.png'.format(env_cfg.domain_rand.max_push_vel_xy))
+        plt.savefig('visualize_base.png')
         
 
 if __name__ == '__main__':
     EXPORT_POLICY =False#True
-    RECORD_FRAMES =False#True
+    RECORD_FRAMES =True
     MOVE_CAMERA = False
     args = get_args()
     play(args)

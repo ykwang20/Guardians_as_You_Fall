@@ -594,20 +594,20 @@ class Go1FallBack(BaseTask):
         # roll=torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device)
         # yaw=torch.zeros_like(pitch)
         # self.root_states[env_ids,3:7]=quat_from_euler_xyz(roll, pitch, yaw).squeeze(1)
-        self.init_pitch_bias[env_ids]=torch_rand_float(-1.2, 1.2, (len(env_ids), 1), device=self.device)
+        self.init_pitch_bias[env_ids]=torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device)
         pitch=-torch.pi/2+self.init_pitch_bias[env_ids]
-        roll=torch_rand_float(-1.2, 1.2, (len(env_ids), 1), device=self.device)
+        roll=torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device)
         yaw=torch.zeros_like(pitch)
         self.root_states[env_ids,3:7]=quat_from_euler_xyz(roll, pitch, yaw).squeeze(1)
         
         v_forward=quat_rotate(self.root_states[:,3:7],self.forward_vec)
         
-        self.root_states[env_ids,2]=v_forward[env_ids,2]*0.55+torch_rand_float(-0.05,0.15,(len(env_ids),1),device=self.device).squeeze()
-        self.dof_pos[env_ids]*=torch_rand_float(0.5, 1.5, (len(env_ids), 12), device=self.device)
+        #self.root_states[env_ids,2]=0.6*v_forward[env_ids,2]+torch_rand_float(0.,0.15,(len(env_ids),1),device=self.device).squeeze()
+        #self.dof_pos[env_ids]*=torch_rand_float(0.5, 1.5, (len(env_ids), 12), device=self.device)
         # base velocities
-        # self.root_states[env_ids, 9] = torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device).squeeze(1) # [7:10]: lin vel, [10:13]: ang vel
-        # self.root_states[env_ids, 7:9] = torch_rand_float(-2, 2, (len(env_ids), 2), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
-        # self.root_states[env_ids, 10:13] = torch_rand_float(-3,3 , (len(env_ids), 3), device=self.device) 
+        self.root_states[env_ids, 9] = torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device).squeeze(1) # [7:10]: lin vel, [10:13]: ang vel
+        self.root_states[env_ids, 7:9] = torch_rand_float(-2, 2, (len(env_ids), 2), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
+        self.root_states[env_ids, 10:13] = torch_rand_float(-2,2 , (len(env_ids), 3), device=self.device) 
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         # print("roll",roll)
