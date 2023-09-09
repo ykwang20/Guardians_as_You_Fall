@@ -94,7 +94,10 @@ class Go1Curr(BaseTask):
     def reset(self):
         """ Reset all robots"""
         #self.foot_pos=self.foot_positions_in_base_frame(self.dof_pos).to(self.device)
-        self.reset_idx(torch.arange(self.num_envs, device=self.device), torch.tensor([],device=self.device), torch.tensor([],device=self.device), torch.tensor([],device=self.device,dtype=torch.int64))
+        init_angle_env_ids =(self.crcstrike_end+torch.arange(self.init_num, device=self.device)).to(torch.long)     
+        self.init_angle(init_angle_env_ids)  
+        reset_env_ids = torch.arange(self.num_envs, device=self.device)[:self.crcstrike_end]
+        self.reset_idx(reset_env_ids, torch.tensor([],device=self.device), torch.tensor([],device=self.device,dtype=torch.int64),init_angle_env_ids=init_angle_env_ids)
         if self.cfg.env.include_history_steps is not None:
             self.obs_buf_history.reset(
                 torch.arange(self.num_envs, device=self.device),
@@ -219,6 +222,7 @@ class Go1Curr(BaseTask):
         env_ids = self.reset_buf[:self.crcstrike_end].nonzero(as_tuple=False).flatten()
         init_angle_env_ids =self.crcstrike_end+self.reset_buf[self.crcstrike_end:].nonzero(as_tuple=False).flatten()
         #terminal_amp_states = self.get_amp_observations()[env_ids]
+        print('init angle ids:',init_angle_env_ids)
         
         self.init_angle(init_angle_env_ids)    
         self.reset_idx(env_ids, pit_env_ids, strike_env_ids, init_angle_env_ids)
@@ -244,6 +248,8 @@ class Go1Curr(BaseTask):
     def check_ball_contact(self):
         #ball_contact=torch.logical_and(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1,self.pushed_buf)
         ball_contact=torch.logical_and(torch.norm(self.rigid_acc[:,0,:], dim=-1) > 10.7,self.pushed_buf)
+        #ball_contact=torch.logical_and(self.root_states[:,2] <0.4,self.pushed_buf)
+        print('acc:',torch.norm(self.rigid_acc[0,0,:], dim=-1))
         #print('contact, striked, ball_contact:',(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1)[0],self.striked_buf[0],ball_contact[0])
         contact_ids=ball_contact.nonzero(as_tuple=False).flatten()
         
@@ -481,6 +487,11 @@ class Go1Curr(BaseTask):
             ball_vel_xy[:,0] = torch_rand_float(1, vel, (len(env_ids), 1), device=self.device).squeeze()
             ball_vel_xy[:,1] = torch_rand_float(-vel, -1, (len(env_ids), 1), device=self.device).squeeze()
         
+        # if torch.rand(1)>0.5:
+        #     ball_vel_xy = torch_rand_float(-vel, -vel, (len(env_ids), 2), device=self.device)
+        # else:
+        #     ball_vel_xy = torch_rand_float(vel, vel, (len(env_ids), 2), device=self.device)
+        
         flying_time = 0.2#0.04#0.2
         descending = 9.8/2*flying_time**2
         
@@ -645,7 +656,7 @@ class Go1Curr(BaseTask):
         pushed_env_ids=push.nonzero(as_tuple=False).flatten()
         pit_env_ids=push[:self.pit_end].nonzero(as_tuple=False).flatten()
         strike_env_ids= self.pit_end+push[self.pit_end:self.crcstrike_end].nonzero(as_tuple=False).flatten()
-        #init_env_ids= self.crcstrike_end+push[self.crcstrike_end:].nonzero(as_tuple=False).flatten()
+        init_env_ids= self.crcstrike_end+push[self.crcstrike_end:].nonzero(as_tuple=False).flatten()
         
         
         if self.cfg.domain_rand.push_robots:
@@ -714,6 +725,10 @@ class Go1Curr(BaseTask):
             kp=self.kp
             kd=self.kd
             
+        if self.damping_mode:
+            kp=torch.where(self.mode==2,torch.zeros_like(kp),kp)
+            kd=torch.where(self.mode==2,40*torch.ones_like(kd),kd)
+            
         if control_type=="P":
             torques = kp*(actions_scaled - self.dof_pos) - kd*self.dof_vel
         elif control_type=="T":
@@ -733,7 +748,7 @@ class Go1Curr(BaseTask):
         if len(env_ids)+len(init_angle_env_ids)==0:
             return
         mid=int((self.stdstrike_end+self.crcstrike_end)//2)
-        self.dof_pos[env_ids] = self.front_dof# * torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
+        self.dof_pos[env_ids] = self.front_dof * torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
         self.dof_vel[env_ids] = 0#torch_rand_float(-3, 3, (len(env_ids), self.num_dof), device=self.device)
         cond=torch.logical_and(env_ids>mid,env_ids<self.crcstrike_end)
         self.dof_pos[env_ids] = torch.where(cond.unsqueeze(1),self.back_dof * torch_rand_float(1., 1., (len(env_ids), self.num_dof),device=self.device),self.dof_pos[env_ids])
@@ -784,7 +799,7 @@ class Go1Curr(BaseTask):
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
             #self.root_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=self.device) # xy position within 1m of the center
-            self.ball_states[ball_ids, :3] = self.root_states[env_ids, :3]+torch.tensor([5,0,0], device=self.device)
+            self.ball_states[ball_ids, :3] = self.root_states[ball_ids, :3]+torch.tensor([5,0,0], device=self.device)
 
         else:
             self.root_states[env_ids] = self.base_init_state
@@ -959,6 +974,7 @@ class Go1Curr(BaseTask):
         self.rigid_acc=torch.zeros_like(self.rigid_lin_vel)
         self.last_rigid_acc=torch.zeros_like(self.rigid_lin_vel)
         self.rigid_jerk=torch.zeros_like(self.rigid_lin_vel)
+        self.damping_mode=False
         
         self.init_pitch_bias=torch.zeros(self.num_envs, 1, dtype=torch.float, device=self.device, requires_grad=False)
 

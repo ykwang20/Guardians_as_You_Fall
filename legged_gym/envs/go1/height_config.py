@@ -35,9 +35,9 @@ class HeightCfg( LeggedRobotCfg ):
 
     class env( LeggedRobotCfg.env ):
         num_envs = 5480
-        include_history_steps = None  # Number of steps of history to include.#3 for stand
-        num_observations =46#46#42#48 #for stand#42
-        num_privileged_obs = 66#66#48#48
+        include_history_steps = 5  # Number of steps of history to include.#3 for stand
+        num_observations =47#46#42#48 #for stand#42
+        num_privileged_obs = 67#66#48#48
         episode_length_s =5#1.5#10.
         reference_state_initialization = False
         # reference_state_initialization_prob = 0.85
@@ -117,7 +117,7 @@ class HeightCfg( LeggedRobotCfg ):
     
     class noise:
         #TODO: add noise to the only to the observation, not privileged observation
-        add_noise = True
+        add_noise = False
         noise_level = 1.0 # scales other values
         class noise_scales:
             dof_pos = 0.03
@@ -160,7 +160,7 @@ class HeightCfg( LeggedRobotCfg ):
     class domain_rand(LeggedRobotCfg.terrain):
         randomize_friction = True
         friction_range = [0.5, 1.25]
-        randomize_base_mass = True
+        randomize_base_mass = False#True
         added_mass_range = [-1., 1.]
         push_robots = False#True
         push_interval_s = 9#15
@@ -247,7 +247,7 @@ class HeightCfgPPO( LeggedRobotCfgPPO ):
         experiment_name = 'height'
         save_interval = 400
         load_stand_policy='/home/yikai/AMP_for_hardware/logs/go1_stand/Jul18_08-29-52_/model_300.pt'
-        load_run='/home/yikai/Fall_Recovery_control/logs/height/Sep04_10-44-57_'
+        load_run='/home/yikai/Fall_Recovery_control/logs/height/Sep04_13-56-25_'
         checkpoint = 4000
         resume = False#True
 

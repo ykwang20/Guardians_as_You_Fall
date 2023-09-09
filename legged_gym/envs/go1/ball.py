@@ -423,9 +423,9 @@ class Go1Ball(BaseTask):
         if 0 in env_ids:
             print('strike_ball')
         if torch.rand(1)>0.5:
-            ball_vel_xy = torch_rand_float(-5., -1, (len(env_ids), 2), device=self.device)
+            ball_vel_xy = torch_rand_float(-1., -1, (len(env_ids), 2), device=self.device)
         else:
-            ball_vel_xy = torch_rand_float(1, 5., (len(env_ids), 2), device=self.device)
+            ball_vel_xy = torch_rand_float(1, 1., (len(env_ids), 2), device=self.device)
         #ball_vel_xy[:,1]=0
         ball_ang_vel = torch_rand_float(-5, 5, (len(env_ids), 3), device=self.device)
         flying_time=0.2

@@ -255,7 +255,9 @@ class Go1Selector(BaseTask):
         #self.reset_buf |= self.recovered_buf#TODO: remove this line
         
     def check_ball_contact(self):
-        ball_contact=torch.logical_and(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1,self.striked_buf)
+        #ball_contact=torch.logical_and(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1,self.striked_buf)
+        ball_contact=torch.logical_and(torch.norm(self.rigid_acc[:,0,:], dim=-1) > 10.7,self.striked_buf)
+        print('acc:',torch.norm(self.rigid_acc[:,0,:], dim=-1)[0])
         #print('contact, striked, ball_contact:',(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1)[0],self.striked_buf[0],ball_contact[0])
         contact_ids=ball_contact.nonzero(as_tuple=False).flatten()
         self.ball_contact_buf[contact_ids]=1
@@ -620,6 +622,7 @@ class Go1Selector(BaseTask):
         """
         #env_ids = (torch.unique(torch.cat((env_ids,push_env_ids)))).long()
         self.dof_pos[env_ids] = self.front_dof * torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
+
         # self.dof_pos[env_ids,7]-=self.init_pitch_bias[env_ids].squeeze(1)
         # self.dof_pos[env_ids,10]-=self.init_pitch_bias[env_ids].squeeze(1)
         self.dof_vel[env_ids] = 0#torch_rand_float(-3, 3, (len(env_ids), self.num_dof), device=self.device)
@@ -669,9 +672,10 @@ class Go1Selector(BaseTask):
             self.ball_states[env_ids, :3] = self.root_states[env_ids, :3]+torch.tensor([2,0,0], device=self.device)
         #self.init_state[env_ids] = self.root_states[env_ids].clone()
         
-        # self.init_pitch_bias[env_ids]=torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device)
+        # self.init_pitch_bias[env_ids]=torch_rand_float(-0.1, 0.1, (len(env_ids), 1), device=self.device)
         # pitch=-torch.pi/2+self.init_pitch_bias[env_ids]
-        # roll=torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device)
+        # roll=torch_rand_float(-0.1, 0.1, (len(env_ids), 1), device=self.device)
+        # self.root_states[env_ids,2]=0.56
         # yaw=torch.zeros_like(pitch)
         # self.root_states[env_ids,3:7]=quat_from_euler_xyz(roll, pitch, yaw).squeeze(1)
         # base velocities

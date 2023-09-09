@@ -53,6 +53,12 @@ from .go1.curr import Go1Curr
 from .go1.curr_config import CurrCfg, CurrCfgPPO
 from .go1.height import Go1Height
 from .go1.height_config import HeightCfg, HeightCfgPPO
+from .go1.draw import Go1Draw
+from .go1.draw_config import Go1DrawCfg, Go1DrawCfgPPO  
+from .go1.stats import Stats
+from .go1.stats_config import StatsCfg, StatsCfgPPO
+from .go1.curr_test import CurrTest
+from .go1.curr_test_config import CurrTestCfg, CurrTestCfgPPO
 
 
 import os
@@ -71,4 +77,7 @@ task_registry.register( "ball", Go1Ball, BallCfg(), BallCfgPPO() )
 task_registry.register( "pit", Go1Pit, PitCfg(), PitCfgPPO() )
 task_registry.register( "curr", Go1Curr, CurrCfg(), CurrCfgPPO() )
 task_registry.register( "height", Go1Height, HeightCfg(), HeightCfgPPO() )
+task_registry.register( "draw", Go1Draw, Go1DrawCfg(), Go1DrawCfgPPO())
+task_registry.register( "stats", Stats, StatsCfg(), StatsCfgPPO() )
+task_registry.register( "curr_test", CurrTest, CurrTestCfg(), CurrTestCfgPPO() )
 

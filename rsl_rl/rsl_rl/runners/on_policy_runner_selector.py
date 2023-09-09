@@ -36,7 +36,7 @@ import statistics
 from torch.utils.tensorboard import SummaryWriter
 import torch
 
-from rsl_rl.algorithms import PPO
+from rsl_rl.algorithms import PPO, PPO_MIMIC
 from rsl_rl.modules import ActorCritic, ActorCriticRecurrent,ActorCritic_Long_Short,ActorCritic_Selector
 from rsl_rl.env import VecEnv
 
@@ -102,7 +102,8 @@ class OnPolicyRunnerSelector:
         _,_=self.env.reset()
         self.front_stand_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/for_stand/exported/policies/stand_kp20_8_21.pt').to(self.device)
         self.back_stand_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_stand/exported/policies/back_stand_policy_from_Aug06_01-53.pt').to(self.device)
-        self.fall_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/ball/exported/policies/strike_fall.pt').to(self.device)
+        self.fall_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/curr/exported/policies/94_mixed_dr.pt').to(self.device)
+        #self.fall_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/ball/exported/policies/strike_fall.pt').to(self.device)        
         self.back_front_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_to_forward/exported/policies/back_for_policy.pt').to(self.device)
         self.front_back_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/forward_to_back/exported/policies/for_back_policy.pt').to(self.device)
         self.estimator=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/estimator/exported/policies/estimator_triple.pt').to(self.device)

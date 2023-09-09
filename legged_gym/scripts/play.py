@@ -28,6 +28,7 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 from isaacgym import gymapi
+from isaacgym.torch_utils import *
 from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
 import copy
@@ -45,13 +46,13 @@ def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     
     # override some parameters for testing
-    env_cfg.env.num_envs =min(env_cfg.env.num_envs, 1)
+    #env_cfg.env.num_envs =min(env_cfg.env.num_envs, 1)
     #env_cfg.terrain.num_rows = 20
     #env_cfg.terrain.num_cols = 20
-    env_cfg.terrain.mesh_type='plane'
+    #env_cfg.terrain.mesh_type='plane'
     env_cfg.terrain.curriculum = False
     env_cfg.noise.add_noise = False#True
-    env_cfg.domain_rand.randomize_friction = True
+    env_cfg.domain_rand.randomize_friction =False# True
     env_cfg.domain_rand.push_robots = True#False
     env_cfg.asset.file='/home/yikai/Fall_Recovery_control/legged_gym/resources/robots/go1/urdf/go1_arrow.urdf'
     # prepare environment
@@ -61,7 +62,7 @@ def play(args):
     # load policy
     train_cfg.runner.resume =True
     ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
-    #policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/for_stand/exported/policies/for_stand_policy_from_Aug_06_01_57.pt').to(env.device)
+    #policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/curr/exported/policies/94_mixed_dr.pt').to(env.device)
 
     policy = ppo_runner.get_inference_policy(device=env.device)
     
@@ -105,83 +106,96 @@ def play(args):
     path=os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'frames')
     #os.mkdir(path)
 
-    base_contact_forces=[]
-    base_jerk=[]
-    base_vel=[]
-    base_acc=[]
-    tot_contact_forces=[]
-    tot_yank=[]
-    tot_net_force=[]
+    
+    trajectories=[]
+    traj=[]#np.zeros((int(env.max_episode_length), 2))
+    #x=torch.mean(env.base_ang_vel[:,1],dim=0).cpu().numpy()
+    #x=torch.mean(env.pitch,dim=0).cpu().numpy()
+    x=torch.mean(env.projected_gravity[:,2],dim=0).cpu().numpy()
+    #y=torch.mean(env.yaw,dim=0).cpu().numpy()
+    y=torch.mean(env.dof_pos[:,[1,4,7,10]],dim=(0,1)).cpu().numpy()
+    traj.append([x,y])
     video=None
     img_idx=0
+    quat_stand =torch.tensor([0.0, -0.707107, 0.0, 0.707107],device=env.device).unsqueeze(0).repeat(env_cfg.env.num_envs,1)
+
     low_filter=None
-    #for i in range(int(4*env.max_episode_length)):
-    for i in range(1200):
-        actions = policy(obs.detach())
-        print('actions',actions[0])
-        # if i==0:
-        #     low_filter=actions
-        # low_filter=0.35*low_filter+0.65*actions
-        actions_init=actions
-        #actions_init=env.init_dof_pos-env.default_dof_pos
-        #actions_none=torch.zeros_like(actions)
-        # if i==0:
-        #     low_filter=actions
-        # low_filter=0.5*low_filter+0.5*actions
-        # if env.projected_gravity[:,2]<0.1 and env.projected_gravity[:,2]>-0.1:
-        #     actions[:,:6]=0
-        obs, critic_obs, _, _, infos, _= env.step(actions.detach())
-        #env.step(i+5000)
-        # base_contact_forces.append((torch.norm(env.contact_forces[:, 0, 2],dim=0)/env_cfg.env.num_envs).cpu().numpy())
-        # base_vel.append((torch.norm(env.rigid_lin_vel[:, 0,:],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
-        # base_acc.append((torch.norm(env.rigid_acc[:, 0,:],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
-        # base_jerk.append((torch.norm(env.rigid_jerk[:, 0,:],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
-        # tot_contact_forces.append((torch.norm(env.contact_forces[:, :, 2],dim=(0,1))/env_cfg.env.num_envs).cpu().numpy())
-        # tot_net_force.append((torch.sum(torch.norm(env.rigid_acc[:,env.penalised_contact_indices]*env.rigid_mass[:,env.penalised_contact_indices].unsqueeze(-1),dim=-1),dim=(0,-1))/env_cfg.env.num_envs).cpu().numpy())
-        # tot_yank.append((torch.sum(torch.square(env.rigid_jerk[:,env.penalised_contact_indices]*env.rigid_mass[:,env.penalised_contact_indices].unsqueeze(-1)*env.dt),dim=(-1,-2,-3))/env_cfg.env.num_envs).cpu().numpy())
-        
-        if RECORD_FRAMES:
-            #if i % 2:
-            name = str(img_idx).zfill(4)
-            filename = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'frames', name + ".png")
-            env.gym.fetch_results(env.sim, True)
-            env.gym.step_graphics(env.sim)
-            env.gym.render_all_camera_sensors(env.sim)
-            env.gym.write_camera_image_to_file(env.sim, env.envs[0], h1,gymapi.IMAGE_COLOR, filename)
-            img = cv2.imread(filename)
-            if video is None:
-                video = cv2.VideoWriter('new_dataset.mp4', cv2.VideoWriter_fourcc(*'MP4V'), int(1 / env.dt), (img.shape[1],img.shape[0]))
-            video.write(img)
-            img_idx += 1 
-            print(filename)
-            #print('***************base_quat**********',env.base_quat)
-            #print('***************lin_vel**********',env.base_lin_vel)
-            #print('*****************lin_vel_command**********',env.commands[0,0])
-            #print('*****************contact_bin**********',obs[0,-4:])
-            #print('****************height*********',env.root_states[:, 2])
-            #print('*************max_height_reward************',env._reward_max_height())
+    roll_angle=[-1+0.2*i for i in range(10)]
+    #roll_angle=[0]
+    pitch_angle=[-1+0.2*i for i in range(10)] #TOOD: change to 0.2*i
+    lin_perb=[-4+1*i for i in range(8)]
+    for pitch_idx in range(len(pitch_angle)):
+        env.pitch_angle=pitch_angle[pitch_idx]
+        for roll_idx in range(len(roll_angle)): 
+            env.roll_angle=roll_angle[roll_idx]
+            for lin_idx in range(len(lin_perb)):
+                env.lin_perb=lin_perb[lin_idx]
+                for i in range(int(env.max_episode_length)+1):
+                        
+                    actions = policy(obs.detach())
+                    #traj[i,0]=torch.mean(env.roll,dim=0).cpu().numpy()
+                    
+                    #traj[i,0]=torch.mean(env.base_ang_vel[:,1],dim=0).cpu().numpy()
+                    #traj[i,1]=torch.mean(env.pitch,dim=0).cpu().numpy()
+                    #traj[i,1]=torch.mean(env.projected_gravity[:,2],dim=0).cpu().numpy()
+                    actions_none=torch.zeros_like(actions)
+                    obs, critic_obs, _, _, infos, _= env.step(actions.detach())
 
-        if MOVE_CAMERA:
-            camera_position += camera_vel * env.dt
-            env.set_camera(camera_position, camera_position + camera_direction)
+                    if env.reset_buf[0]:
+                        print(i)
+                        #if abs(traj[-1][0])>0.6:
+                        trajectories.append(np.array(traj))
+                        traj=[]#np.zeros((int(env.max_episode_length), 2))
+                        print('load_{}_traj'.format(pitch_idx*len(roll_angle)*len(lin_perb)+roll_idx*len(lin_perb) +lin_idx))
+                        break
+                    
+                    x=torch.mean(env.projected_gravity[:,2],dim=0).cpu().numpy()
+                    y=torch.mean(env.dof_pos[:,[1,4,7,10]],dim=(0,1)).cpu().numpy()
+                    # quat_relative=quat_mul(env.base_quat,quat_conjugate(quat_stand))
+                    # rpy=get_euler_xyz_tensor(quat_relative)
+                    # x=torch.mean(rpy[:,0],dim=0).cpu().numpy()
+                    # y=torch.mean(rpy[:,1],dim=0).cpu().numpy()
 
-        if i < stop_state_log:
-            logger.log_states(
-                {
-                    'dof_pos_target': actions[robot_index, joint_index].item() * env.cfg.control.action_scale,
-                    'dof_pos': env.dof_pos[robot_index, joint_index].item(),
-                    'dof_vel': env.dof_vel[robot_index, joint_index].item(),
-                    'dof_torque': env.torques[robot_index, joint_index].item(),
-                    'command_x': env.commands[robot_index, 0].item(),
-                    'command_y': env.commands[robot_index, 1].item(),
-                    'command_yaw': env.commands[robot_index, 2].item(),
-                    'base_vel_x': env.base_lin_vel[robot_index, 0].item(),
-                    'base_vel_y': env.base_lin_vel[robot_index, 1].item(),
-                    'base_vel_z': env.base_lin_vel[robot_index, 2].item(),
-                    'base_vel_yaw': env.base_ang_vel[robot_index, 2].item(),
-                    'contact_forces_z': env.contact_forces[robot_index, env.feet_indices, 2].cpu().numpy()
-                }
-            )
+                    traj.append([x,y])
+
+                
+            
+                    if RECORD_FRAMES:
+                        #if i % 2:
+                        name = str(img_idx).zfill(4)
+                        filename = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'frames', name + ".png")
+                        env.gym.fetch_results(env.sim, True)
+                        env.gym.step_graphics(env.sim)
+                        env.gym.render_all_camera_sensors(env.sim)
+                        env.gym.write_camera_image_to_file(env.sim, env.envs[0], h1,gymapi.IMAGE_COLOR, filename)
+                        img = cv2.imread(filename)
+                        if video is None:
+                            video = cv2.VideoWriter('99_recovery.mp4', cv2.VideoWriter_fourcc(*'MP4V'), int(1 / env.dt), (img.shape[1],img.shape[0]))
+                        video.write(img)
+                        img_idx += 1 
+                        print(filename)
+                        
+                    if MOVE_CAMERA:
+                        camera_position += camera_vel * env.dt
+                        env.set_camera(camera_position, camera_position + camera_direction)
+
+                    if i < stop_state_log:
+                        logger.log_states(
+                            {
+                                'dof_pos_target': actions[robot_index, joint_index].item() * env.cfg.control.action_scale,
+                                'dof_pos': env.dof_pos[robot_index, joint_index].item(),
+                                'dof_vel': env.dof_vel[robot_index, joint_index].item(),
+                                'dof_torque': env.torques[robot_index, joint_index].item(),
+                                'command_x': env.commands[robot_index, 0].item(),
+                                'command_y': env.commands[robot_index, 1].item(),
+                                'command_yaw': env.commands[robot_index, 2].item(),
+                                'base_vel_x': env.base_lin_vel[robot_index, 0].item(),
+                                'base_vel_y': env.base_lin_vel[robot_index, 1].item(),
+                                'base_vel_z': env.base_lin_vel[robot_index, 2].item(),
+                                'base_vel_yaw': env.base_ang_vel[robot_index, 2].item(),
+                                'contact_forces_z': env.contact_forces[robot_index, env.feet_indices, 2].cpu().numpy()
+                            }
+                        )
         # elif i==stop_state_log:
         #     logger.plot_states()
         # if  0 < i < stop_rew_log:
@@ -191,32 +205,54 @@ def play(args):
         #             logger.log_rewards(infos["episode"], num_episodes)
         # elif i==stop_rew_log:
         #     logger.print_rewards()
-            
-    # import matplotlib.pyplot as plt
-    # # plt.figure()
-    # plt.subplot(4,2,1)
-    # plt.plot(base_contact_forces,label='base_contact')
-    # plt.ylabel('bese_contact_force')
-    # plt.subplot(4,2,3)
-    # plt.plot(base_vel,label='base_vel')
-    # plt.ylabel('base_vel')
-    # plt.subplot(4,2,5)
-    # plt.plot(base_acc,label='base_acc')
-    # plt.ylabel('base_acc')
-    # plt.subplot(4,2,7)
-    # plt.plot(base_jerk,label='base_jerk')
-    # plt.ylabel('base_jerk')
-    # plt.subplot(4,2,2)
-    # plt.plot(tot_contact_forces,label='tot_contact')
-    # plt.ylabel('tot_contact_force')
-    # plt.subplot(4,2,4)
-    # plt.plot(tot_net_force,label='tot_net_force')
-    # plt.ylabel('tot_net_force')
-    # plt.subplot(4,2,8)
-    # plt.plot(tot_yank,label='tot_yank')
-    # plt.ylabel('tot_yank')
-    # plt.savefig('visualize.png')
+        
+    import matplotlib.pyplot as plt
+    trajectories[0][0]=trajectories[0][1]
+
     
+    gradients = np.gradient(trajectories, axis=1)
+
+    arrow_density = 1  # 箭头密度
+    arrow_scale = 0.1  # 箭头缩放因子
+
+    plt.figure(figsize=(10, 6))
+
+    for traj, grad in zip(trajectories, gradients):
+        x, y = traj[:, 0], traj[:, 1]
+        #plt.plot(x[:int(env.max_episode_length)-50], y[:int(env.max_episode_length)-50],color='black', alpha=0.7, linewidth=0.7)
+        plt.plot(x, y, alpha=0.7, linewidth=0.7)
+        plt.scatter(x[0], y[0], c='red', marker='o')
+
+        for i in range(0, len(traj[:20]), arrow_density):
+            x, y = traj[i, 0], traj[i, 1]
+            dx, dy = grad[i][0], grad[i][1]
+            gradient_vector = np.array([dx, dy])
+            gradient_magnitude = np.linalg.norm(gradient_vector)
+            #if i < int(env.max_episode_length)-50:
+            #plt.arrow(x, y, 0.04*dx*gradient_magnitude , 0.04*dy*gradient_magnitude, head_width=0.02, head_length=0.2, color='r', alpha=0.5)
+
+    plt.title('with linear perturbation')
+    plt.xlabel('projected gravity')
+    plt.ylabel('hip dof pos')
+    # plt.xlabel('roll angle')
+    # plt.ylabel('pitch angle')
+
+    plt.grid(False)
+    plt.savefig('/home/yikai/Fall_Recovery_control/legged_gym/scripts/plt_lin_perb.png')
+    
+    plt.figure(figsize=(10, 6))
+    for traj in trajectories:
+        plt.plot(traj[:,0], alpha=0.7, linewidth=0.7)
+    plt.savefig('/home/yikai/Fall_Recovery_control/legged_gym/scripts/plt_test1.png')
+    
+    plt.figure(figsize=(10, 6))
+    for traj in trajectories:
+        plt.plot(traj[:,1], alpha=0.7, linewidth=0.7)
+    plt.savefig('/home/yikai/Fall_Recovery_control/legged_gym/scripts/plt_test2.png')
+
+                
+            
+   
 
 if __name__ == '__main__':
     EXPORT_POLICY = False#True

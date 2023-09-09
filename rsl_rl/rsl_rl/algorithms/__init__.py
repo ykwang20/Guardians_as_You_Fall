@@ -31,3 +31,4 @@
 from .ppo import PPO
 from .super import SUPER
 from .value import VALUE
+from .ppo_mimic import PPO_MIMIC

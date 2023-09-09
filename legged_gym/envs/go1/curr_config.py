@@ -271,7 +271,7 @@ class CurrCfgPPO( LeggedRobotCfgPPO ):
         experiment_name = 'curr'
         save_interval = 200
         load_stand_policy='/home/yikai/AMP_for_hardware/logs/go1_stand/Jul18_08-29-52_/model_300.pt'
-        load_run='/home/yikai/Fall_Recovery_control/logs/curr/Sep03_03-09-37_'
+        load_run='/home/yikai/Fall_Recovery_control/logs/curr/Sep04_13-28-38_'
         #checkpoint=1600
         checkpoint = 2800
         resume = False

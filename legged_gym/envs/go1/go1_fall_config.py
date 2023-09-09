@@ -99,7 +99,7 @@ class Go1FallCfg( LeggedRobotCfg ):
     
     class noise:
         #TODO: add noise to the only to the observation, not privileged observation
-        add_noise = False
+        add_noise = True
         noise_level = 1.0 # scales other values
         class noise_scales:
             dof_pos = 0.03
@@ -128,9 +128,17 @@ class Go1FallCfg( LeggedRobotCfg ):
             px=[0.1,0.35]
             py=[0,0.1]
         manip=False
+        
     class terrain( LeggedRobotCfg.terrain ):
-        mesh_type = 'plane'
+        mesh_type = 'trimesh'
+        selected = False#'pit_terrain' # select a unique terrain type and pass all arguments
         measure_heights = False
+        curriculum = False#True
+        num_rows= 10 # number of terrain rows (levels)
+        num_cols = 10 # number of terrain cols (types)
+        max_init_terrain_level = 6 # starting curriculum state
+        # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete, stepping stone, gap, pit, plane]
+        terrain_proportions = [0., 1., 0., 0., 0., 0., 0., 0., 0.] # proportions of terrain types
         
     class sim(LeggedRobotCfg.sim):
         dt =  0.005
@@ -145,7 +153,7 @@ class Go1FallCfg( LeggedRobotCfg ):
         added_mass_range = [-1., 1.]
         push_robots = True
         push_interval_s = 3#15
-        max_push_vel_xy = 5.
+        max_push_vel_xy = 2.
         randomize_gains = True#False
         stiffness_multiplier_range = [0.9, 1.1]
         damping_multiplier_range = [0.9, 1.1]
@@ -190,10 +198,10 @@ class Go1FallCfg( LeggedRobotCfg ):
             feet_air_time =  0.0
             feet_stumble = 0.0 
             action_rate_exp =0 #0.3for stand
-            action_rate=-2.5e-3#-2.5e-3#-5e-4#-0.005for stand
+            action_rate=0#-5e-3#-2.5e-3#-5e-4#-0.005for stand
             hip_pos=0#-0.1
             stand_still = 0.0
-            dof_pos_limits = -10
+            dof_pos_limits =0# -10
             upright=0 #1.0 for stand
             max_height=0 #1.0for stand
             work=0#-0.003
@@ -203,12 +211,12 @@ class Go1FallCfg( LeggedRobotCfg ):
             pursue_goal=0#1
             hang=0#-2
             body_orientation=1#1
-            body_height=2
-            dof_pos=2      
+            body_height=1#2
+            dof_pos=1#2      
             foot_height=1#0.5#1
-            action=0#-1e-3
+            action=-1e-3
             recovery=0#100
-            collision=-1e-5#-5e-5#-5e-4#-1e-5#-5e-4#-0.001#-5e-4
+            collision=0#-1e-5#-5e-5#-5e-4#-1e-5#-5e-4#-0.001#-5e-4
             net_force=0#-5e-5#-5e-4
             yank=0#-1.25e-5#-1.25e-6#-1.25e-5#-1.25e-4#-1.25e-5
             high_cmd=0#1
@@ -226,12 +234,12 @@ class Go1FallCfgPPO( LeggedRobotCfgPPO ):
         entropy_coef = 0.01
     class runner( LeggedRobotCfgPPO.runner ):
         policy_class_name = 'ActorCritic'
-        max_iterations = 25000 # number of policy updates
+        max_iterations = 10000#25000 # number of policy updates
         run_name = ''
         experiment_name = 'back_to_forward'
         save_interval = 400
         load_stand_policy='/home/yikai/AMP_for_hardware/logs/go1_stand/Jul18_08-29-52_/model_300.pt'
-        load_run='/home/yikai/Fall_Recovery_control/logs/back_to_forward/Aug28_13-57-32_'
+        load_run='/home/yikai/Fall_Recovery_control/logs/back_to_forward/Sep09_02-34-24_'
         #checkpoint =2000
         resume = False#True
 

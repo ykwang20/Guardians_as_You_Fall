@@ -317,7 +317,7 @@ class Go1Height(BaseTask):
                                     self.dof_vel * self.obs_scales.dof_vel,
                                     self.actions,
                                     self.contact_filt,
-                                    #self.root_states[:,2].unsqueeze(1)
+                                    self.root_states[:,2].unsqueeze(1)
                                     #self.manip_commands[:,:3],
                                     #(self.manip_commands[:,3]-self.manip_init_p[:,0]).unsqueeze(1),
                                     #(self.manip_commands[:,4]-self.manip_init_p[:,1]).unsqueeze(1),
@@ -610,7 +610,7 @@ class Go1Height(BaseTask):
         # # base velocities
         self.root_states[env_ids, 9] = torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device).squeeze(1) # [7:10]: lin vel, [10:13]: ang vel
         self.root_states[env_ids, 7:9] = torch_rand_float(-2.5, 2.5, (len(env_ids), 2), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
-        self.root_states[env_ids, 10:13] = torch_rand_float(-2,2 , (len(env_ids), 3), device=self.device) 
+        self.root_states[env_ids, 10:13] = torch_rand_float(-5,5 , (len(env_ids), 3), device=self.device) 
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         # print("roll",roll)

@@ -259,8 +259,8 @@ class SelectorCfgPPO( LeggedRobotCfgPPO ):
         experiment_name = 'selector'
         save_interval = 200
         load_stand_policy='/home/yikai/AMP_for_hardware/logs/go1_stand/Jul18_08-29-52_/model_300.pt'
-        load_run='/home/yikai/Fall_Recovery_control/logs/selector/Aug23_04-24-34_'
-        #checkpoint = 400
+        load_run='/home/yikai/Fall_Recovery_control/logs/selector/Sep04_22-25-03_'
+        checkpoint = 4000
         resume = False#True
 
   
