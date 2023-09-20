@@ -20,7 +20,7 @@ This repository is based on legged_gym https://leggedrobotics.github.io/legged_g
     - Clone this repository
    - `cd legged_gym && pip install -e .`
 
-### CODE STRUCTURE ###
+### Code Structure ###
 1. Each environment is defined by an env file (`*env_name*.py`) and a config file (`*env_name*_config.py`). The config file contains two classes: one conatianing all the environment parameters (`*env_name*Cfg`) and one for the training parameters (`*env_name*CfgPPo`).  
 2. Both env and config classes use inheritance.  
 3. Each non-zero reward scale specified in `cfg` will add a function with a corresponding name to the list of elements which will be summed to get the total reward.  
