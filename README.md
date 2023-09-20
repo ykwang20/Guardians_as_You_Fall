@@ -113,5 +113,11 @@ The base environment `legged_robot` implements a rough terrain locomotion task. 
 ## Guidelines for Onboard Deployment
 #### Connect user PC to onboard mini PC
 1. Set the user's PC IP to: 192.168.123.xxx, so that the user's PC and the onboard PC can be integrated into the same local network.
-2. Connect to the mini PC with ethernet or ssh.
+2. Connect to one of the mini PC via ethernet or ssh. The recommendation is the Jetson NX: 192.168.123.15
+
+#### Configure the Libtorch
+The main tools being used are libtorch(C++ version of Pytorch) and other dependencies listed in https://github.com/unitreerobotics/unitree_legged_sdk. Ideally, the required environment is pre-installed. Check the version of pre-installed Pytorch. If the version is >=1.8.0, skip to **Deploy a Custom Model**. Otherwise, you need to manully install Libtorch on the mini PC. There are several choices:
+1. Download the source code of Libtorch to the mini PC and compile onboard. *Downloading the official pre-built version is not feasible because all mini PCs are based on the ARM architecture*.
+2. Download the pre-built PyTorch pip wheel installers for Jetson.https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-11-now-available/72048
+3. A simple but inelegant approach
 
