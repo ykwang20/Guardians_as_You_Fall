@@ -137,4 +137,37 @@ Then enter the docker by `cd ./go1_gym_deploy/docker && sudo make run` .
 
 ### Deploy a Custom Model
 1. Export a TorchScript model of your custom model. `play.py` could accomplish this by setting `EXPORT_POLICY = True`.
-2. Edit the `CMakeLists.txt`, add `find_package(Torch REQUIRED)` at the begining.
+2. Write your .cpp source code to receive sensor data （filter the data if needed), inference, and perform action. An example can be found here.
+3. Edit the `CMakeLists.txt`:
+```
+cmake_minimum_required(VERSION 2.8.3)
+project(unitree_legged_sdk)
+
+find_package(Torch REQUIRED) #Add this line
+
+# check arch and os
+message("-- CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
+if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64.*")
+  set(ARCH amd64)
+endif()
+if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "aarch64.*")
+  set(ARCH arm64)
+endif()
+
+include_directories(include)
+link_directories(lib/cpp/${ARCH})
+
+option(PYTHON_BUILD "build python wrapper" OFF)
+if(PYTHON_BUILD)
+  add_subdirectory(python_wrapper)
+endif()
+
+set(EXTRA_LIBS -pthread libunitree_legged_sdk.a)
+set(CMAKE_CXX_FLAGS "-O3 -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+set(CMAKE_CXX_STANDARD 14)
+
+add_executable(nn_with_wireless_handle example/nn_with_wireless_handle.cpp)
+target_link_libraries(nn_with_wireless_handle ${TORCH_LIBRARIES} ${EXTRA_LIBS})     # to configure your source code
+```
+
