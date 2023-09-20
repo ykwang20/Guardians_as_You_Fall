@@ -48,8 +48,8 @@ def play(args):
     env_cfg.env.num_envs =2000
     #env_cfg.terrain.num_rows = 20
     #env_cfg.terrain.num_cols = 20
-    env_cfg.env.episode_length_s =3#20
-    env_cfg.terrain.task_proportions = [0.,1.,0.,0.]
+    env_cfg.env.episode_length_s =5#20
+    env_cfg.terrain.task_proportions = [0.,0.,1.,0.]
     env_cfg.terrain.mesh_type='plane'
     env_cfg.terrain.max_init_terrain_level = 9
     env_cfg.terrain.curriculum = True
