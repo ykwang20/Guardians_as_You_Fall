@@ -137,7 +137,7 @@ Then enter the docker by `cd ./go1_gym_deploy/docker && sudo make run` .
 
 ### Deploy a Custom Model
 1. Export a TorchScript model of your custom model. `play.py` could accomplish this by setting `EXPORT_POLICY = True`.
-2. Write your .cpp source code to receive sensor data （filter the data if needed), inference, and perform action. An example can be found here.
+2. Write your source code `source.cpp` to receive sensor data （filter the data if needed), inference, and perform action. An example can be found here.
 3. Edit the `CMakeLists.txt`:
 ```
 cmake_minimum_required(VERSION 2.8.3)
@@ -167,7 +167,7 @@ set(CMAKE_CXX_FLAGS "-O3 -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(nn_with_wireless_handle example/nn_with_wireless_handle.cpp)
-target_link_libraries(nn_with_wireless_handle ${TORCH_LIBRARIES} ${EXTRA_LIBS})     # to configure your source code
+add_executable(executable path/to/source.cpp)
+target_link_libraries(executable ${TORCH_LIBRARIES} ${EXTRA_LIBS})     # to configure your source code
 ```
 
