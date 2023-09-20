@@ -16,6 +16,8 @@
 #include <unistd.h>
 #include <deque>
 
+//TODO: swap Left and Right!!!
+
 using namespace std;
 using namespace UNITREE_LEGGED_SDK;
 
