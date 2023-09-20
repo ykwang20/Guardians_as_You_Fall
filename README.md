@@ -1,20 +1,15 @@
-# Isaac Gym Environments for Legged Robots #
-This repository provides the environment used to train ANYmal (and other robots) to walk on rough terrain using NVIDIA's Isaac Gym.
-It includes all components needed for sim-to-real transfer: actuator network, friction & mass randomization, noisy observations and random pushes during training.  
-**Maintainer**: Nikita Rudin  
-**Affiliation**: Robotic Systems Lab, ETH Zurich  
-**Contact**: rudinn@ethz.ch  
+# GYF: Active Mode Transition for Safe Falling #
+### Code Base 
 
-### Useful Links ###
-Project website: https://leggedrobotics.github.io/legged_gym/
-Paper: https://arxiv.org/abs/2109.11978
+This repository is based on legged_gym https://leggedrobotics.github.io/legged_gym/.  
+
 
 ### Installation ###
 1. Create a new python virtual env with python 3.6, 3.7 or 3.8 (3.8 recommended)
 2. Install pytorch 1.10 with cuda-11.3:
-    - `pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio==0.10.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html`
+    - `pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 tensorboard==2.8.0 pybullet==3.2.1 opencv-python==4.5.5.64 torchaudio==0.10.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html`
 3. Install Isaac Gym
-   - Download and install Isaac Gym Preview 3 (Preview 2 will not work!) from https://developer.nvidia.com/isaac-gym
+   - Download and install Isaac Gym Preview 4 from https://developer.nvidia.com/isaac-gym
    - `cd isaacgym/python && pip install -e .`
    - Try running an example `cd examples && python 1080_balls_of_solitude.py`
    - For troubleshooting check docs `isaacgym/docs/index.html`)
@@ -26,18 +21,31 @@ Paper: https://arxiv.org/abs/2109.11978
    - `cd legged_gym && pip install -e .`
 
 ### CODE STRUCTURE ###
-1. Each environment is defined by an env file (`legged_robot.py`) and a config file (`legged_robot_config.py`). The config file contains two classes: one conatianing all the environment parameters (`LeggedRobotCfg`) and one for the training parameters (`LeggedRobotCfgPPo`).  
+1. Each environment is defined by an env file (`*env_name*.py`) and a config file (`*env_name*_config.py`). The config file contains two classes: one conatianing all the environment parameters (`*env_name*Cfg`) and one for the training parameters (`*env_name*CfgPPo`).  
 2. Both env and config classes use inheritance.  
 3. Each non-zero reward scale specified in `cfg` will add a function with a corresponding name to the list of elements which will be summed to get the total reward.  
 4. Tasks must be registered using `task_registry.register(name, EnvClass, EnvConfig, TrainConfig)`. This is done in `envs/__init__.py`, but can also be done from outside of this repository.  
 
+
+
+### Framework
+
+![917_overview](Fall_Recovery_control/logs/917_overview.pdf)
+
+1. Working policy: the standing policy, trained with `go1_stand.py`.
+2. Transition controller: the policy for falling control, trained with `curr.py`, which provides mixed terrains, mixed tasks and training curriculum.
+3. recovery controller, the policy for convert the quadrupedal from reversed mode to regular mode, trained with `go1_fall.py`.
+4. Planner: trained with `selector.py`, which is trained to select the appropriate low-level policy. Trained from demonstration.
+
+The rl algorithm of each environment is defined in the corresponding `_config.py` files.
+
 ### Usage ###
 1. Train:  
-  ```python issacgym_anymal/scripts/train.py --task=anymal_c_flat```
+    ```python issacgym_anymal/scripts/train.py --task=back --headless```
     -  To run on CPU add following arguments: `--sim_device=cpu`, `--rl_device=cpu` (sim on CPU and rl on GPU is possible).
     -  To run headless (no rendering) add `--headless`.
     - **Important**: To improve performance, once the training starts press `v` to stop the rendering. You can then enable it later to check the progress.
-    - The trained policy is saved in `issacgym_anymal/logs/<experiment_name>/<date_time>_<run_name>/model_<iteration>.pt`. Where `<experiment_name>` and `<run_name>` are defined in the train config.
+    - The trained policy is saved in `./logs/<experiment_name>/<date_time>_<run_name>/model_<iteration>.pt`. Where `<experiment_name>` and `<run_name>` are defined in the train config.
     -  The following command line arguments override the values set in the config files:
      - --task TASK: Task name.
      - --resume:   Resume training from a checkpoint
@@ -49,7 +57,7 @@ Paper: https://arxiv.org/abs/2109.11978
      - --seed SEED:  Random seed.
      - --max_iterations MAX_ITERATIONS:  Maximum number of training iterations.
 2. Play a trained policy:  
-```python issacgym_anymal/scripts/play.py --task=anymal_c_flat```
+   ```python ./legged_gym/scripts/play.py --task=back```
     - By default the loaded policy is the last model of the last run of the experiment folder.
     - Other runs/model iteration can be selected by setting `load_run` and `checkpoint` in the train config.
 
@@ -70,7 +78,11 @@ The base environment `legged_robot` implements a rough terrain locomotion task. 
 1. If you get the following error: `ImportError: libpython3.8m.so.1.0: cannot open shared object file: No such file or directory`, do: `sudo apt install libpython3.8`
 
 ### Known Issues ###
-1. The contact forces reported by `net_contact_force_tensor` are unreliable when simulating on GPU with a triangle mesh terrain. A workaround is to use force sensors, but the force are propagated through the sensors of consecutive bodies resulting in an undesireable behaviour. However, for a legged robot it is possible to add sensors to the feet/end effector only and get the expected results. When using the force sensors make sure to exclude gravity from trhe reported forces with `sensor_options.enable_forward_dynamics_forces`. Example:
+
+1. The function `gym.set_*_tensor()` or `gym.set_*_tensor_indexed()` can take effect only once in a simulation step. If multiple times of reset of joints or root states is needed, a solution is to record the indices of envs need to be reset in this step, reset all the environments recorded at the end of each step.
+
+2. The contact forces reported by `net_contact_force_tensor` are unreliable when simulating on GPU with a triangle mesh terrain. A workaround is to use force sensors, but the force are propagated through the sensors of consecutive bodies resulting in an undesireable behaviour. However, for a legged robot it is possible to add sensors to the feet/end effector only and get the expected results. When using the force sensors make sure to exclude gravity from trhe reported forces with `sensor_options.enable_forward_dynamics_forces`. Example:
+
 ```
     sensor_pose = gymapi.Transform()
     for name in feet_names:
@@ -91,3 +103,4 @@ The base environment `legged_robot` implements a rough terrain locomotion task. 
     self.gym.refresh_force_sensor_tensor(self.sim)
     contact = self.sensor_forces[:, :, 2] > 1.
 ```
+
