@@ -120,3 +120,17 @@ The main tools being used are libtorch(C++ version of Pytorch) and other depende
 1. Download the source code of Libtorch to the mini PC and compile onboard. *Downloading the official pre-built version is not feasible because all mini PCs are based on the ARM architecture*.
 2. Download the pre-built PyTorch pip wheel installers for Jetson.https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-11-now-available/72048
 3. Build a docker image containing the required libtorch and other dependencies, and install the docker on the mini PC. Could use the docker provided by https://github.com/Improbable-AI/walk-these-ways.git directly. Then edit the `Dockerfile` to mount the directory 'unitree_legged_sdk` into docker, as follows:
+```
+RUN useradd -m $USERNAME && \
+        echo "$USERNAME:$USERNAME" | chpasswd && \
+        usermod --shell /bin/bash $USERNAME && \
+        usermod -aG sudo $USERNAME && \
+        mkdir /etc/sudoers.d && \
+        echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$USERNAME && \
+        chmod 0440 /etc/sudoers.d/$USERNAME && \
+        # Add this line
+        # Replace 1000 with your user/group id
+        usermod  --uid 1000 $USERNAME && \
+        groupmod --gid 1000 $USERNAME
+```
+Then enter the docker by `cd ./go1_gym_deploy/docker && sudo make run` .
