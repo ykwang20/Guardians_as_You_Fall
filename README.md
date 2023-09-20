@@ -167,7 +167,7 @@ set(CMAKE_CXX_FLAGS "-O3 -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(executable path/to/source.cpp)
-target_link_libraries(executable ${TORCH_LIBRARIES} ${EXTRA_LIBS})     # to configure your source code
+add_executable(executable_name path/to/source.cpp)
+target_link_libraries(executable_name ${TORCH_LIBRARIES} ${EXTRA_LIBS})     # to configure your source code
 ```
 
