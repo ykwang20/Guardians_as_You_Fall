@@ -1,4 +1,7 @@
 # GYF: Active Mode Transition for Safe Falling #
+Code for training and onboard deployment.
+********
+
 ### Code Base 
 
 This repository is based on legged_gym https://leggedrobotics.github.io/legged_gym/.  
@@ -106,4 +109,9 @@ The base environment `legged_robot` implements a rough terrain locomotion task. 
     self.gym.refresh_force_sensor_tensor(self.sim)
     contact = self.sensor_forces[:, :, 2] > 1.
 ```
+*********
+## Guidelines for Onboard Deployment
+#### Connect user PC to onboard mini PC
+1. Set the user's PC IP to: 192.168.123.xxx, so that the user's PC and the onboard PC can be integrated into the same local network.
+2. Connect to the mini PC with ethernet or ssh.
 
