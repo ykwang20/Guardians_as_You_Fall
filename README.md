@@ -119,19 +119,24 @@ The base environment `legged_robot` implements a rough terrain locomotion task. 
 The main tools being used are libtorch(C++ version of Pytorch) and other dependencies listed in https://github.com/unitreerobotics/unitree_legged_sdk. Ideally, the required environment is pre-installed. Check the version of pre-installed Pytorch. If the version is >=1.8.0, skip to **Deploy a Custom Model**. Otherwise, you need to manully install Libtorch on the mini PC. There are several choices:
 1. Download the source code of Libtorch to the mini PC and compile onboard. *Downloading the official pre-built version is not feasible because all mini PCs are based on the ARM architecture*.
 2. Download the pre-built PyTorch pip wheel installers for Jetson.https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-11-now-available/72048
-3. Build a docker image containing the required libtorch and other dependencies, and install the docker on the mini PC. Could use the docker provided by https://github.com/Improbable-AI/walk-these-ways.git directly. Then edit the `Dockerfile` to mount the directory 'unitree_legged_sdk` into docker, as follows:
+3. Build a docker image containing the required libtorch and other dependencies, and install the docker on the mini PC. Could use the docker provided by https://github.com/Improbable-AI/walk-these-ways.git directly. Then mount the `~/unitree/unitree_legged_sdk/` directory into the docker by moving directory inside `~/unitree/go1_gym/` and editting the `Makefile` as follows:
 ```
-RUN useradd -m $USERNAME && \
-        echo "$USERNAME:$USERNAME" | chpasswd && \
-        usermod --shell /bin/bash $USERNAME && \
-        usermod -aG sudo $USERNAME && \
-        mkdir /etc/sudoers.d && \
-        echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$USERNAME && \
-        chmod 0440 /etc/sudoers.d/$USERNAME && \
-        # Add this line
-        # Replace 1000 with your user/group id
-        usermod  --uid 1000 $USERNAME && \
-        groupmod --gid 1000 $USERNAME
+run:
+	docker stop foxy_controller || true
+	docker rm foxy_controller || true
+	docker run -it \
+		--env="DISPLAY" \
+		--env="QT_X11_NO_MITSHM=1" \
+		--volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
+		--env="XAUTHORITY=${XAUTH}" \
+		--volume="${XAUTH}:${XAUTH}" \
+		--volume="/home/unitree/go1_gym:/home/isaac/go1_gym" \   # this line mount the go1_gym directory into the docker
+		--privileged \
+		--runtime=nvidia \
+		--net=host \
+		--workdir="/home/isaac/go1_gym" \
+		--name="foxy_controller" \
+		jetson-model-deployment bash
 ```
 Then enter the docker by `cd ./go1_gym_deploy/docker && sudo make run` .
 
