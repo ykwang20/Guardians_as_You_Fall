@@ -30,7 +30,7 @@ This repository is based on legged_gym https://leggedrobotics.github.io/legged_g
 
 ### Framework
 
-[917_overview.pdf](https://github.com/wangyiji20/Fall_Recovery_control/files/12667476/917_overview.pdf)
+![917_overview.pdf](https://github.com/wangyiji20/Fall_Recovery_control/files/12667476/917_overview.pdf)
 
 
 
