@@ -177,5 +177,5 @@ cd build
 cmake .. -DCMAKE_PREFIX_PATH=$(python3 -c 'import torch;print(torch.utils.cmake_prefix_path)')
 make
 ```
-5. Run the controller: `cd build && sudo ./executable_name'
+5. Run the controller: `cd build && sudo ./executable_name`
 
