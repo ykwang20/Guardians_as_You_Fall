@@ -174,7 +174,7 @@ target_link_libraries(executable_name ${TORCH_LIBRARIES} ${EXTRA_LIBS})     # to
 ```
 mkdir build
 cd build
-cmake .. -DCMAKE_PREFIX_PATH=$(python3 -c 'import torch;print(torch.utils.cmake_prefix_path)')
+cmake .. -DCMAKE_PREFIX_PATH=$(python3 -c 'import torch;print(torch.utils.cmake_prefix_path)') # to locate libtorch
 make
 ```
 5. Run the controller: `cd build && sudo ./executable_name`
