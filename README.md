@@ -30,7 +30,7 @@ This repository is based on legged_gym https://leggedrobotics.github.io/legged_g
 
 ### Framework
 
-![917_overview](Fall_Recovery_control/logs/917_overview.pdf)
+![917_overview](/logs/917_overview.pdf)
 
 1. Working policy: the standing policy, trained with `go1_stand.py`.
 2. Transition controller: the policy for falling control, trained with `curr.py`, which provides mixed terrains, mixed tasks and training curriculum.
