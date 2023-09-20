@@ -141,9 +141,10 @@ run:
 Then enter the docker by `cd ./go1_gym_deploy/docker && sudo make run` .
 
 ### Deploy a Custom Model
-1. Export a TorchScript model of your custom model. `play.py` could accomplish this by setting `EXPORT_POLICY = True`.
-2. Write your control source code `source.cpp` to receive sensor data （filter the data if needed), inference, and perform action. An example can be found here.
-3. Edit the `CMakeLists.txt`:
+1. `cd unitree_legged_sdk`
+2. Export a TorchScript model of your custom model. `play.py` could accomplish this by setting `EXPORT_POLICY = True`.
+3. Write your control source code `source.cpp` to receive sensor data （filter the data if needed), inference, and perform action. An example can be found here.
+4. Edit the `CMakeLists.txt`:
 ```
 cmake_minimum_required(VERSION 2.8.3)
 project(unitree_legged_sdk)
@@ -175,12 +176,12 @@ set(CMAKE_CXX_STANDARD 14)
 add_executable(executable_name path/to/source.cpp)
 target_link_libraries(executable_name ${TORCH_LIBRARIES} ${EXTRA_LIBS})     # to configure your source code
 ```
-4. Compile:
+5. Compile:
 ```
 mkdir build
 cd build
 cmake .. -DCMAKE_PREFIX_PATH=$(python3 -c 'import torch;print(torch.utils.cmake_prefix_path)') # to locate libtorch
 make
 ```
-5. Run the controller: `cd build && sudo ./executable_name`
+6. Run the controller: `cd build && sudo ./executable_name`
 
