@@ -134,3 +134,7 @@ RUN useradd -m $USERNAME && \
         groupmod --gid 1000 $USERNAME
 ```
 Then enter the docker by `cd ./go1_gym_deploy/docker && sudo make run` .
+
+### Deploy a Custom Model
+1. Export a TorchScript model of your custom model. `play.py` could accomplish this by setting `EXPORT_POLICY = True`.
+2. Edit the `CMakeLists.txt`, add `find_package(Torch REQUIRED)` at the begining.
