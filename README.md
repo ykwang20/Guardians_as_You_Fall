@@ -183,5 +183,6 @@ cd build
 cmake .. -DCMAKE_PREFIX_PATH=$(python3 -c 'import torch;print(torch.utils.cmake_prefix_path)') # to locate libtorch
 make
 ```
+6. Switch the robot to damping mode using remote controller. The command sequence is : `L2+A`, `L2+B`, `L1+L2+START`.
 6. Run the controller: `cd build && sudo ./executable_name`
 
