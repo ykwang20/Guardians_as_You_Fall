@@ -118,7 +118,8 @@ class Go1FallBack(BaseTask):
         # step physics and render each frame
         self.render()
         for _ in range(self.cfg.control.decimation):
-            self.torques = self._compute_torques(self.actions).view(self.torques.shape)
+            #self.torques = self._compute_torques(self.actions).view(self.torques.shape)
+            self.torques = self._compute_torques(self.last_actions).view(self.torques.shape)
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
             self.gym.simulate(self.sim)
             if self.device == 'cpu':
@@ -178,6 +179,8 @@ class Go1FallBack(BaseTask):
         self.last_contacts = contact_bin
         rigid_acc=(self.rigid_lin_vel-self.last_rigid_lin_vel)/self.dt
         rigid_jerk=(rigid_acc-self.last_rigid_acc)/self.dt
+        #print('rigid_acc:',torch.norm(rigid_acc[0,0],dim=-1))
+        print('rigid_jerk:',torch.norm(rigid_jerk[0,0],dim=-1))
         
         self.rigid_acc=torch.where(self.episode_length_buf.unsqueeze(1).unsqueeze(2)<2,torch.zeros_like(rigid_acc),rigid_acc)
         self.rigid_jerk=torch.where(self.episode_length_buf.unsqueeze(1).unsqueeze(2)<3,torch.zeros_like(rigid_jerk),rigid_jerk)
@@ -330,13 +333,18 @@ class Go1FallBack(BaseTask):
             self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, heights), dim=-1)
 
         self.privileged_obs_buf=torch.cat((self.contact_forces[...,2].view(self.num_envs,-1)*0.1, self.privileged_obs_buf),dim=-1)
-        self.obs_buf = self.privileged_obs_buf[:, -self.num_obs:]
+        self.obs_buf = self.privileged_obs_buf[:, -46:]
         # print('dofs', self.dof_pos[0, :])
         # print('base height', self.root_states[0, 2])
+        # print('RR hip:',self.contact_forces[0, 9])
+        # print('RL hip:',self.contact_forces[0, 13])
         
         # add noise if needed
         if self.add_noise:
             self.obs_buf += (2 * torch.rand_like(self.obs_buf) - 1) * self.noise_scale_vec
+            #self.obs_buf=self.obs_buf[:,3:3+self.num_obs]
+        self.obs_buf=self.obs_buf[:,:self.num_obs]
+        self.privileged_obs_buf=torch.cat((self.last_actions,self.privileged_obs_buf),dim=-1)
             
     def get_amp_observations(self,amp_forward=["joint_pose","foot","joint_vel","z"]):
         joint_pos = self.dof_pos
@@ -405,6 +413,11 @@ class Go1FallBack(BaseTask):
 
             for s in range(len(props)):
                 props[s].friction = self.friction_coeffs[env_id]
+        if env_id==0:
+            min_restitution, max_restitution =self.cfg.domain_rand.restitution_range
+            self.restitutions = torch_rand_float(min_restitution, max_restitution, (self.num_envs, 1), device=self.device)
+        for s in range(len(props)):
+            props[s].restitution = self.restitutions[env_id, 0]
         return props
 
     def _process_dof_props(self, props, env_id):
@@ -451,6 +464,11 @@ class Go1FallBack(BaseTask):
         if self.cfg.domain_rand.randomize_base_mass:
             rng = self.cfg.domain_rand.added_mass_range
             props[0].mass += np.random.uniform(rng[0], rng[1])
+        if env_id==0:
+            min_disp, max_disp = self.cfg.domain_rand.com_disp_range
+            self.com_disp=torch_rand_float(min_disp, max_disp, (self.num_envs, 3), device=self.device)
+        props[0].com = gymapi.Vec3(self.com_disp[env_id, 0], self.com_disp[env_id, 1],
+                                   self.com_disp[env_id, 2])
         return props
     
     
@@ -515,14 +533,15 @@ class Go1FallBack(BaseTask):
         #pd controller
         actions_scaled = actions * self.cfg.control.action_scale
         control_type = self.cfg.control.control_type
-
+        
         if self.cfg.domain_rand.randomize_gains:
             p_gains = self.randomized_p_gains
             d_gains = self.randomized_d_gains
         else:
             p_gains = self.p_gains
             d_gains = self.d_gains
-
+        
+        
         if control_type=="P":
             torques = p_gains*(actions_scaled + self.default_dof_pos - self.dof_pos) - d_gains*self.dof_vel
         elif control_type=="V":
@@ -531,6 +550,7 @@ class Go1FallBack(BaseTask):
             torques = actions_scaled
         else:
             raise NameError(f"Unknown controller type: {control_type}")
+        
         return torch.clip(torques, -self.torque_limits, self.torque_limits)
 
     def _reset_dofs(self, env_ids):
@@ -541,9 +561,9 @@ class Go1FallBack(BaseTask):
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        self.dof_pos[env_ids] = self.init_dof_pos #* torch_rand_float(0.75, 1.25, (len(env_ids), self.num_dof), device=self.device)
-        self.dof_pos[env_ids,7]-=self.init_pitch_bias[env_ids].squeeze(1)
-        self.dof_pos[env_ids,10]-=self.init_pitch_bias[env_ids].squeeze(1)
+        self.dof_pos[env_ids] = self.init_dof_pos * torch_rand_float(0.9, 1.1, (len(env_ids), self.num_dof), device=self.device)
+        #self.dof_pos[env_ids,7]-=self.init_pitch_bias[env_ids].squeeze(1)
+        #self.dof_pos[env_ids,10]-=self.init_pitch_bias[env_ids].squeeze(1)
         self.dof_vel[env_ids] = 0#torch_rand_float(-3, 3, (len(env_ids), self.num_dof), device=self.device)
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
@@ -594,20 +614,24 @@ class Go1FallBack(BaseTask):
         # roll=torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device)
         # yaw=torch.zeros_like(pitch)
         # self.root_states[env_ids,3:7]=quat_from_euler_xyz(roll, pitch, yaw).squeeze(1)
-        self.init_pitch_bias[env_ids]=torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device)
+        
+        #self.init_pitch_bias[env_ids]=torch_rand_float(-0.26178, -0.26178, (len(env_ids), 1), device=self.device)
+        self.init_pitch_bias[env_ids]=torch_rand_float(-0.7854, -0.7854, (len(env_ids), 1), device=self.device)
+
         pitch=-torch.pi/2+self.init_pitch_bias[env_ids]
-        roll=torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device)
-        yaw=torch.zeros_like(pitch)
+        roll=torch_rand_float(-0., 0., (len(env_ids), 1), device=self.device)
+        #yaw=torch.zeros_like(pitch)
+        yaw=torch_rand_float(-2, 2, (len(env_ids), 1), device=self.device)
         self.root_states[env_ids,3:7]=quat_from_euler_xyz(roll, pitch, yaw).squeeze(1)
         
         v_forward=quat_rotate(self.root_states[:,3:7],self.forward_vec)
         
-        #self.root_states[env_ids,2]=0.6*v_forward[env_ids,2]+torch_rand_float(0.,0.15,(len(env_ids),1),device=self.device).squeeze()
+        self.root_states[env_ids,2]=0.54*v_forward[env_ids,2]#+torch_rand_float(0.,0.15,(len(env_ids),1),device=self.device).squeeze()
         #self.dof_pos[env_ids]*=torch_rand_float(0.5, 1.5, (len(env_ids), 12), device=self.device)
         # base velocities
-        self.root_states[env_ids, 9] = torch_rand_float(-0.5, 0.5, (len(env_ids), 1), device=self.device).squeeze(1) # [7:10]: lin vel, [10:13]: ang vel
-        self.root_states[env_ids, 7:9] = torch_rand_float(-2, 2, (len(env_ids), 2), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
-        self.root_states[env_ids, 10:13] = torch_rand_float(-2,2 , (len(env_ids), 3), device=self.device) 
+        self.root_states[env_ids, 7:13] = torch_rand_float(-0.3, 0.3, (len(env_ids), 6), device=self.device).squeeze(1) # [7:10]: lin vel, [10:13]: ang vel
+        # self.root_states[env_ids, 7:9] = torch_rand_float(-2, 2, (len(env_ids), 2), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
+        # self.root_states[env_ids, 10:13] = torch_rand_float(-2,2 , (len(env_ids), 3), device=self.device) 
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         # print("roll",roll)
@@ -688,7 +712,8 @@ class Go1FallBack(BaseTask):
         Returns:
             [torch.Tensor]: Vector of scales used to multiply a uniform distribution in [-1, 1]
         """
-        noise_vec = torch.zeros_like(self.obs_buf[0])
+        #noise_vec = torch.zeros_like(self.obs_buf[0])
+        noise_vec = torch.zeros(self.num_envs,46,device=self.device)
         self.add_noise = self.cfg.noise.add_noise
         noise_scales = self.cfg.noise.noise_scales
         noise_level = self.cfg.noise.noise_level
@@ -1015,6 +1040,7 @@ class Go1FallBack(BaseTask):
             self.gym.set_actor_dof_properties(env_handle, anymal_handle, dof_props)
             body_props = self.gym.get_actor_rigid_body_properties(env_handle, anymal_handle)
             body_props = self._process_rigid_body_props(body_props, i)
+            
             self.gym.set_actor_rigid_body_properties(env_handle, anymal_handle, body_props, recomputeInertia=True)
             self.actor_handles.append(anymal_handle)
             
@@ -1221,6 +1247,10 @@ class Go1FallBack(BaseTask):
         # Penalize changes in actions
         return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
     
+    def _reward_dof_vel_penalty(self):
+        # Penalize changes in actions
+        return torch.sum(torch.square(self.dof_vel), dim=1)
+    
     def _reward_hip_pos(self):
         return torch.sum(torch.square(self.dof_pos[:,[0,3,6,9]]), dim=1)
     
@@ -1331,34 +1361,45 @@ class Go1FallBack(BaseTask):
     # Falling reward
     def _reward_body_orientation(self):
         #print('***********body_orientation***********:',self.projected_gravity)
-        return torch.square(self.projected_gravity[:,2])
-        #return torch.square(0.5+0.5*self.projected_gravity[:,2])
+
+        #return torch.square(self.projected_gravity[:,2])
+        return torch.square(0.5+0.5*self.projected_gravity[:,2])
     
     def _reward_body_height(self):
         height_d=self.desired_base_pos[:,2]
         #print('*******height*********',self.root_states[:,2])
-        reward=1-torch.square((height_d-self.root_states[:,2])/height_d).clip(min=0.,max=1.)
+        reward_for=1-torch.square((height_d-self.root_states[:,2])/height_d).clip(min=0.,max=1.)
+        reward_back=1-torch.square((0.274-self.root_states[:,2])/0.274).clip(min=0.,max=1.)
         #reward=reward*torch.tanh(-2*self.projected_gravity[:,2])
-        condition=torch.logical_or(self.projected_gravity[:,2]<-0.6 , self.projected_gravity[:,2]>0.6)
+        reward_forward=torch.where(self.projected_gravity[:,2]<-0.6,reward_for,torch.zeros_like(reward_for))
+        reward=reward_forward+torch.where(self.projected_gravity[:,2]>0.6,reward_back,torch.zeros_like(reward_back))
+        #condition=torch.logical_or(self.projected_gravity[:,2]<-0.6 , self.projected_gravity[:,2]>0.6)
         #condition=self.projected_gravity[:,2]>0.6
-        return torch.where(condition,reward,torch.zeros_like(reward))
+        #print('*******height*********',self.root_states[:,2])
+        #return torch.where(condition,reward,torch.zeros_like(reward))
+        return reward
     
     def _reward_dof_pos(self):
         reward_forward=1-torch.clip(torch.sum(torch.square(self.dof_pos-self.desired_dof),dim=1)/20,min=0.,max=1.)
         reward_back=1-torch.clip(torch.sum(torch.square(self.dof_pos-self.back_desired_dof),dim=1)/20,min=0.,max=1.)
         
-        reward_forward=torch.where(self.projected_gravity[:,2]<-0.6,reward_forward,torch.zeros_like(reward_forward))
-        reward=reward_forward+torch.where(self.projected_gravity[:,2]>0.6,reward_back,torch.zeros_like(reward_back))
+        reward_forward=torch.where(self.projected_gravity[:,2]<-0.96,reward_forward,torch.zeros_like(reward_forward))
+        #reward=reward_forward+torch.where(self.projected_gravity[:,2]>0.95,reward_back,torch.zeros_like(reward_back))
+        reward=torch.where(self.projected_gravity[:,2]>0.95,reward_back,torch.zeros_like(reward_back))
+        #print('dof pos',self.dof_pos[0])
         return reward
         #return torch.where(self.projected_gravity[:,2]>0.6,reward_back,torch.zeros_like(reward_back))
     
     def _reward_foot_height(self):
         reward=torch.exp(-10*torch.sum(torch.square(self.feet_pos[:,:,2]),dim=1))
-        condition=torch.logical_or(self.projected_gravity[:,2]<-0.6 , self.projected_gravity[:,2]>0.6)
+        condition=torch.logical_or(self.projected_gravity[:,2]<-0.8 , self.projected_gravity[:,2]>0.8)
         #condition=self.projected_gravity[:,2]>0.6
-        return torch.where(condition,
-                           reward,
-                           torch.zeros_like(reward))
+        #reward=torch.where(condition,reward,torch.zeros_like(reward))
+        back_reward=torch.exp(-10*torch.sum(torch.square(self.feet_pos[:,2:,2]),dim=1))
+        back_reward=torch.where(condition,torch.zeros_like(back_reward),back_reward)
+        #return reward+back_reward
+        return reward
+                           
     
     def _reward_action(self):
         return torch.sum(torch.square(self.actions),dim=1)
@@ -1392,6 +1433,15 @@ class Go1FallBack(BaseTask):
     def _reward_joint_vel(self):
         return torch.sum(torch.square(self.dof_vel), dim=1)
     
+    def _reward_action_limit(self):
+        actions=self.actions+self.default_dof_pos
+        upper=torch.square((actions-self.dof_pos_limits[:,1]).clip(min=0.))
+        lower=torch.square((self.dof_pos_limits[:,0]-actions).clip(min=0.))
+        #print('reward_action_limit:',torch.sum(upper+lower,dim=1))
+        return torch.sum(upper+lower,dim=1)
+    
+    def _reward_height_penalty(self):
+        return torch.square((self.root_states[:,2]-0.23).clip(max=0))
     
         
     

@@ -36,15 +36,15 @@ class Go1FallBackCfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
         num_envs = 5480
         include_history_steps = None  # Number of steps of history to include.#3 for stand
-        num_observations =46#46#42#48 #for stand#42
-        num_privileged_obs = 66#66#48#48
+        num_observations =46#42#48 #for stand#42
+        num_privileged_obs = 78#48#48
         episode_length_s =5#1.5#10.
         reference_state_initialization = False
         # reference_state_initialization_prob = 0.85
         # amp_motion_files = MOTION_FILES
 
     class init_state( LeggedRobotCfg.init_state ):
-        pos = [0.0, 0.0, 0.55] # x,y,z [m]
+        pos = [0.0, 0.0, 0.54] # x,y,z [m]
         #pos = [0.0, 0.0, 0.35] # x,y,z [m]
         rot = [0.0, -0.707107, 0.0, 0.707107] # x,y,z,w [quat]
         #rot = [0., -1.0, 0.0, 0.0] # x,y,z,w [quat]
@@ -66,10 +66,10 @@ class Go1FallBackCfg( LeggedRobotCfg ):
             '3_RR_calf_joint': -1.0,    # [rad]
         }
         back_desired_angles={
-            '2_FL_hip_joint': 0.,   # [rad]
-            '4_RL_hip_joint': 0.,   # [rad]
-            '1_FR_hip_joint': 0. ,  # [rad]
-            '3_RR_hip_joint': 0.,   # [rad]
+            '2_FL_hip_joint': -0.1,   # [rad]
+            '4_RL_hip_joint': -0.1,   # [rad]
+            '1_FR_hip_joint': 0.1 ,  # [rad]
+            '3_RR_hip_joint': 0.1,   # [rad]
 
             '2_FL_thigh_joint': 3.7,     # [rad]
             '4_RL_thigh_joint': 4.0416,   # [rad]
@@ -148,6 +148,7 @@ class Go1FallBackCfg( LeggedRobotCfg ):
     class terrain( LeggedRobotCfg.terrain ):
         mesh_type = 'plane'
         measure_heights = False
+        restitution = 0.2
         
     class sim(LeggedRobotCfg.sim):
         dt =  0.005
@@ -160,12 +161,14 @@ class Go1FallBackCfg( LeggedRobotCfg ):
         friction_range = [0.5, 1.25]
         randomize_base_mass = True
         added_mass_range = [-1., 1.]
-        push_robots = False#True
-        push_interval_s = 9#15
+        push_robots = True
+        push_interval_s = 4#15
         max_push_vel_xy = 1.
-        randomize_gains = False
+        randomize_gains = True#False
         stiffness_multiplier_range = [0.9, 1.1]
         damping_multiplier_range = [0.9, 1.1]
+        restitution_range=[0,0.4]
+        com_disp_range=[-0.05,0.05]
     
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
@@ -200,17 +203,18 @@ class Go1FallBackCfg( LeggedRobotCfg ):
             lin_vel_z =0# -1
             ang_vel_xy = 0.0
             orientation = 0.0
-            torques = -1e-6#-1e-5#-4e-7#-1e-5#-4e-7 #-0.00005 for stand
-            dof_vel =0  #-0.15 for stand
+            torques = -0.00001#-1e-6#-1e-5#-4e-7#-1e-5#-4e-7 #-0.00005 for stand
+            dof_vel =0.5  #-0.15 for stand
+            dof_vel_penalty=0#-0.001
             dof_acc =0  #-2.5e-7 for stand
             base_height = 0.0 
             feet_air_time =  0.0
             feet_stumble = 0.0 
             action_rate_exp =0  #0.3for stand
-            action_rate=-5e-3#-2.5e-3#-5e-4#-0.005for stand
+            action_rate=-1e-2#-5e-3#-2.5e-3#-5e-4#-0.005for stand
             hip_pos=0#-0.1
             stand_still = 0.0
-            dof_pos_limits = -10
+            dof_pos_limits =-10# -10
             upright=0 #1.0 for stand
             max_height=0 #1.0for stand
             work=0#-0.003
@@ -220,14 +224,16 @@ class Go1FallBackCfg( LeggedRobotCfg ):
             pursue_goal=0#1
             hang=0#-2
             body_orientation=1
-            body_height=2
-            dof_pos=2
+            body_height=1
+            dof_pos=1
             foot_height=1#0.5#1
+            height_penalty=0#-100
             action=0#-1e-3
             recovery=0#100
-            collision=-5e-5#-1e-5#-5e-4#-0.001#-5e-4
-            net_force=0#-5e-5#-5e-4
-            yank=-1.25e-5#-1.25e-5#-1.25e-4#-1.25e-5
+            collision=-5e-5#-5e-5#-1e-5#-5e-4#-0.001#-5e-4
+            net_force=0#-5e-6#-5e-5#-5e-4
+            yank=0#-1.25e-6#-1.25e-5#-1.25e-4#-1.25e-5
+            action_limit=-2
             
         only_positive_rewards = False#True # if true negative total rewards are clipped at zero (avoids early termination problems)
 
@@ -240,12 +246,12 @@ class Go1FallBackCfgPPO( LeggedRobotCfgPPO ):
         entropy_coef = 0.01
     class runner( LeggedRobotCfgPPO.runner ):
         policy_class_name = 'ActorCritic'
-        max_iterations = 25000 # number of policy updates
+        max_iterations = 10000 # number of policy updates
         run_name = ''
         experiment_name = 'go1_fall_back'
         save_interval = 400
         load_stand_policy='/home/yikai/AMP_for_hardware/logs/go1_stand/Jul18_08-29-52_/model_300.pt'
-        load_run='/home/yikai/Fall_Recovery_control/logs/go1_fall_back/Jul25_02-18-55_'
+        load_run='/home/yikai/Fall_Recovery_control/logs/go1_fall_back/Sep13_22-16-52_'
         #checkpoint = 3600
         resume = False#True
 
