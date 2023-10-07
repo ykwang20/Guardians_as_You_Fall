@@ -107,6 +107,7 @@ class OnPolicyRunnerSelector:
         self.back_front_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_to_forward/exported/policies/back_for_policy.pt').to(self.device)
         self.front_back_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/forward_to_back/exported/policies/for_back_policy.pt').to(self.device)
         self.estimator=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/estimator/exported/policies/estimator_triple.pt').to(self.device)
+        self.recovery=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_to_forward/exported/policies/99_back_for_terrain.pt').to(self.device)
     
     def learn(self, num_learning_iterations, init_at_random_ep_len=False):
         # initialize writer
@@ -139,16 +140,14 @@ class OnPolicyRunnerSelector:
                 for i in range(self.num_steps_per_env):
                     
                     actions = self.alg.act_high(obs, critic_obs)
-                    mode=torch.argmax(actions[:,:2], dim=1).unsqueeze(1)
-                    height=actions[:,2]
+                    mode=torch.argmax(actions[:,:3], dim=1).unsqueeze(1)
+                    height=actions[:,3]
                     #print('mode',mode[0])
                     
                     for _ in range(1):
                         low_actions=torch.where(mode==0, self.front_stand_policy(obs[:,-3*self.env.num_obs:]+self.front_offset),self.zero_action)
-                        low_actions+=torch.where(mode==2, self.back_stand_policy(obs[:,-3*self.env.num_obs:]+self.front_offset),self.zero_action)
                         low_actions+=torch.where(mode==1, self.fall_policy(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
-                        low_actions+=torch.where(mode==3, self.back_front_policy(obs[:,-self.env.num_obs:]),self.zero_action)
-                        low_actions+=torch.where(mode==4, self.front_back_policy(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
+                        low_actions+=torch.where(mode==2, self.back_front_policy(obs[:,-self.env.num_obs:]),self.zero_action)
                         
                         obs, privileged_obs, rewards, dones, infos, _= self.env.step(low_actions,mode.squeeze(1),height)
                         #obs, privileged_obs, rewards, dones, infos, _= self.env.step(low_actions,mode.squeeze(1),torch.zeros_like(mode))
