@@ -146,9 +146,7 @@ class Go1Selector(BaseTask):
         if self.privileged_obs_buf is not None:
             self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
             
-        mode_one_hot = torch.zeros(self.num_envs, 2, device=self.device)
-        mode_one_hot.scatter_(1, torch.tensor(mode).unsqueeze(1), 1)
-        mode_one_hot = torch.zeros(self.num_envs, 2, device=self.device)
+        mode_one_hot = torch.zeros(self.num_envs, 3, device=self.device)
         mode_one_hot.scatter_(1, torch.tensor(mode).unsqueeze(1), 1)
         #print('mode_one_hot:',mode_one_hot[0])
         #selector_obs=torch.cat(((self.root_states[:,2].unsqueeze(1))*torch_rand_float(0.75,1.25,(self.num_envs,1),device=self.device),self.high_cmd,mode_one_hot,policy_obs),dim=1)#*torch_rand_float(0.75,1.25,(self.num_envs,1),device=self.device)),dim=1)        selector_obs=torch.cat(((self.root_states[:,2].unsqueeze(1))*torch_rand_float(0.75,1.25,(self.num_envs,1),device=self.device),self.high_cmd,mode_one_hot,policy_obs),dim=1)#*torch_rand_float(0.75,1.25,(self.num_envs,1),device=self.device)),dim=1)
@@ -168,7 +166,7 @@ class Go1Selector(BaseTask):
             policy_obs = self.obs_buf_history.get_obs_vec(np.arange(self.include_history_steps))
         else:
             policy_obs = self.obs_buf
-        return torch.cat((torch.zeros(self.num_envs,2,device=self.device),policy_obs, self.root_states[:,2].unsqueeze(1)),dim=1)
+        return torch.cat((torch.zeros(self.num_envs,3,device=self.device),policy_obs, self.root_states[:,2].unsqueeze(1)),dim=1)
 
     def post_physics_step(self):
         """ check terminations, compute observations and rewards
@@ -248,18 +246,29 @@ class Go1Selector(BaseTask):
         fall=(self.est_height<0.33).squeeze()
         #fall = torch.any(torch.norm(self.contact_forces[:, self.front_feet_indices, :], dim=-1) > 1., dim=1)
         fall = (fall.logical_and(self.striked_buf.squeeze())).unsqueeze(1)
-        self.high_cmd=torch.logical_or(self.high_cmd,fall)
+        high_cmd_fall=torch.logical_or(self.high_cmd,fall).to(torch.int64)
+        self.high_cmd=torch.where(self.high_cmd<2,high_cmd_fall,self.high_cmd)
         change_cmd=self.episode_length_buf==15
         change_cmd_idx=change_cmd.nonzero(as_tuple=False).flatten()
         self.high_cmd[change_cmd_idx]=0
+        recover=torch.logical_and(self.episode_length_buf==200,self.projected_gravity[:,2]>0.6)
+        recover_idx=recover.nonzero(as_tuple=False).flatten()
+        #recover_idx=torch.arange(self.num_envs,device=self.device)
+        self.high_cmd[recover_idx]=2
         #self.reset_buf |= self.recovered_buf#TODO: remove this line
         
     def check_ball_contact(self):
         #ball_contact=torch.logical_and(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1,self.striked_buf)
-        ball_contact=torch.logical_and(torch.norm(self.rigid_acc[:,0,:], dim=-1) > 10.7,self.striked_buf)
+        
+        ball_contact=torch.logical_or(torch.abs(self.projected_gravity[:,2])>0.2,torch.norm(self.rigid_acc[:,0,:], dim=-1) > 10.7)
+        ball_contact=torch.logical_and(ball_contact,self.striked_buf)
+        #print('projected_gravity:',self.projected_gravity[0])
+        #ball_contact=torch.logical_and(torch.norm(self.rigid_acc[:,0,:], dim=-1) > 10.7,self.striked_buf)
+        #print('acc:',torch.norm(self.rigid_acc[:,0,:], dim=-1)[0])
         #print('contact, striked, ball_contact:',(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1)[0],self.striked_buf[0],ball_contact[0])
         contact_ids=ball_contact.nonzero(as_tuple=False).flatten()
         self.ball_contact_buf[contact_ids]=1
+        
         #self.mode[contact_ids]=1
 
     def reset_idx(self, env_ids):
@@ -272,7 +281,9 @@ class Go1Selector(BaseTask):
         Args:
             env_ids (list[int]): List of environment ids which must be reset
         """
-        if len(env_ids) == 0:# and len(push_env_ids)==0:
+        reset_ball_ids=self.episode_length_buf == 125
+        reset_ball_ids=reset_ball_ids.nonzero(as_tuple=False).flatten()
+        if len(env_ids) +len(reset_ball_ids)== 0:# and len(push_env_ids)==0:
             return
         # update curriculum
         if self.cfg.terrain.curriculum:
@@ -283,7 +294,7 @@ class Go1Selector(BaseTask):
         
         # reset robot states
         
-        self._reset_root_states(env_ids)
+        self._reset_root_states(env_ids,reset_ball_ids)
         self._reset_dofs(env_ids)
             
 
@@ -421,9 +432,13 @@ class Go1Selector(BaseTask):
         if 0 in env_ids:
             print('strike_ball')
         if torch.rand(1)>0.5:
-            ball_vel_xy = torch_rand_float(-7.5, -1.5, (len(env_ids), 2), device=self.device)
+            ball_vel_xy = torch_rand_float(-5., -5, (len(env_ids), 2), device=self.device)
         else:
-            ball_vel_xy = torch_rand_float(1.5, 7.5, (len(env_ids), 2), device=self.device)
+            ball_vel_xy = torch_rand_float(-3, -3., (len(env_ids), 2), device=self.device)
+        ball_vel_xy = torch_rand_float(-6., 6, (len(env_ids), 2), device=self.device)
+        # ball_vel_xy[:,0] = torch_rand_float(2.5,2.5, (len(env_ids), 1), device=self.device).squeeze()
+        # ball_vel_xy[:,1] = torch_rand_float(6, 6, (len(env_ids), 1), device=self.device).squeeze()
+        #ball_vel_xy = torch_rand_float(-6, 6, (len(env_ids), 2), device=self.device)
         #ball_vel_xy[:,1]=0
         ball_ang_vel = torch_rand_float(-5, 5, (len(env_ids), 3), device=self.device)
         flying_time=0.2
@@ -641,7 +656,7 @@ class Go1Selector(BaseTask):
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
         # print("dof",self.dof_pos[env_ids])
 
-    def _reset_root_states(self, env_ids):
+    def _reset_root_states(self, env_ids,reset_ball_ids):
         """ Resets ROOT states position and velocities of selected environmments
             Sets base position based on the curriculum
             Selects randomized base velocities within -0.5:0.5 [m/s, rad/s]
@@ -649,6 +664,7 @@ class Go1Selector(BaseTask):
             env_ids (List[int]): Environemnt ids
         """
         # base position
+        ball_ids=torch.unique(torch.cat((env_ids,reset_ball_ids)))
         if self.custom_origins:
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
@@ -845,7 +861,7 @@ class Go1Selector(BaseTask):
         
         self.init_pitch_bias=torch.zeros(self.num_envs, 1, dtype=torch.float, device=self.device, requires_grad=False)
 
-        self.high_cmd=torch.zeros(self.num_envs, 1, dtype=torch.long, device=self.device, requires_grad=False)
+        self.high_cmd=torch.zeros(self.num_envs, 1, dtype=torch.int64, device=self.device, requires_grad=False)
         #self.goal=to_torch(self.cfg.commands.goal, device=self.device).repeat((self.num_envs, 1))
         #self.dist_to_goal=torch.ones(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)*torch.norm(self.goal, dim=-1)
         #self.prev_dist_to_goal=torch.ones(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)*torch.norm(self.goal, dim=-1)

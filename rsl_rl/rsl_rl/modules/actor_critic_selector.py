@@ -49,7 +49,6 @@ class ActorCritic_Selector(nn.Module):
         if kwargs:
             print("ActorCritic.__init__ got unexpected arguments, which will be ignored: " + str([key for key in kwargs.keys()]))
         super(ActorCritic_Selector, self).__init__()
-
         activation = get_activation(activation)
 
         mlp_input_dim_a = num_actor_obs
@@ -122,17 +121,18 @@ class ActorCritic_Selector(nn.Module):
 
     def update_distribution(self, observations):
         mean = self.actor(observations)
-        softmax_output = nn.functional.softmax(mean[:, :2], dim=-1)
-        mean=torch.cat((softmax_output, mean[:, 2].unsqueeze(1)), dim=-1)
+        softmax_output = nn.functional.softmax(mean[:, :-1], dim=-1)
+        mean=torch.cat((softmax_output, mean[:, -1].unsqueeze(1)), dim=-1)
         #print("mean", mean)                    
         #print("std:",std)
         # zeros =torch.zeros_like(mean) 
         #std = (self.std.to(mean.device))/5
-        std=torch.cat((0.2*torch.ones_like(softmax_output),0.01*torch.ones_like(mean[:, 2].unsqueeze(1))), dim=-1)
+        std=torch.cat((0.2*torch.ones_like(softmax_output),0.01*torch.ones_like(mean[:, -1].unsqueeze(1))), dim=-1)
         # mean=(mean + Normal(zeros, std).sample()).clip(min=0.001,max=1)
         #mean[:,:]=mean[:,:]/torch.sum(mean[:,:],dim=1).unsqueeze(1)
         #self.distribution = OneHotCategorical(mean)
-        self.distribution = Normal(mean, std)
+        #self.distribution = Normal(mean, std)
+        self.distribution = Normal(mean, std*0.001)
 
     def act(self, observations, **kwargs):
         self.update_distribution(observations)
@@ -144,8 +144,8 @@ class ActorCritic_Selector(nn.Module):
 
     def act_inference(self, observations):
         actions_mean = self.actor(observations)
-        softmax_output = nn.functional.softmax(actions_mean[:, :2], dim=-1)
-        actions=torch.cat((softmax_output, actions_mean[:, 2].unsqueeze(1)), dim=-1)
+        softmax_output = nn.functional.softmax(actions_mean[:, :3], dim=-1)
+        actions=torch.cat((softmax_output, actions_mean[:, -1].unsqueeze(1)), dim=-1)
         return actions
 
     def evaluate(self, critic_observations, **kwargs):

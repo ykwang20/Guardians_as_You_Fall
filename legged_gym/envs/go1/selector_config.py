@@ -34,11 +34,11 @@ class SelectorCfg( LeggedRobotCfg ):
 
     class env( LeggedRobotCfg.env ):
         num_envs = 5480
-        num_modes=3#2#5
+        num_modes=4#2#5
         include_history_steps =3 #10  # Number of steps of history to include.#3 for stand
         num_observations =46#46#42#48 #for stand#42
-        num_privileged_obs =55# 54#54#70#69#73#72#66#48#48
-        num_selector_obs =141#141#463#467# 466
+        num_privileged_obs =56# 54#54#70#69#73#72#66#48#48
+        num_selector_obs =142#141#463#467# 466
         episode_length_s =5#5#20
         reference_state_initialization = False
         # reference_state_initialization_prob = 0.85
