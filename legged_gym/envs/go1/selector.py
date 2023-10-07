@@ -257,7 +257,6 @@ class Go1Selector(BaseTask):
     def check_ball_contact(self):
         #ball_contact=torch.logical_and(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1,self.striked_buf)
         ball_contact=torch.logical_and(torch.norm(self.rigid_acc[:,0,:], dim=-1) > 10.7,self.striked_buf)
-        print('acc:',torch.norm(self.rigid_acc[:,0,:], dim=-1)[0])
         #print('contact, striked, ball_contact:',(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1)[0],self.striked_buf[0],ball_contact[0])
         contact_ids=ball_contact.nonzero(as_tuple=False).flatten()
         self.ball_contact_buf[contact_ids]=1

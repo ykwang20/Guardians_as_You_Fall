@@ -222,7 +222,6 @@ class Go1Curr(BaseTask):
         env_ids = self.reset_buf[:self.crcstrike_end].nonzero(as_tuple=False).flatten()
         init_angle_env_ids =self.crcstrike_end+self.reset_buf[self.crcstrike_end:].nonzero(as_tuple=False).flatten()
         #terminal_amp_states = self.get_amp_observations()[env_ids]
-        print('init angle ids:',init_angle_env_ids)
         
         self.init_angle(init_angle_env_ids)    
         self.reset_idx(env_ids, pit_env_ids, strike_env_ids, init_angle_env_ids)
@@ -1256,7 +1255,6 @@ class Go1Curr(BaseTask):
                     body_props = self._process_rigid_body_props(body_props, i)
                     self.gym.set_actor_rigid_body_properties(env_handle, ball_handle, body_props, recomputeInertia=True)
                     self.ball_handles.append(ball_handle)
-                    print('ball_ids',self.gym.get_actor_index(env_handle, ball_handle, gymapi.DOMAIN_SIM))
                     
             self.envs.append(env_handle)
             
