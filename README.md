@@ -17,11 +17,10 @@ This repository is based on legged_gym https://leggedrobotics.github.io/legged_g
    - Try running an example `cd examples && python 1080_balls_of_solitude.py`
    - For troubleshooting check docs `isaacgym/docs/index.html`)
 4. Install rsl_rl (PPO implementation)
-   - Clone https://github.com/leggedrobotics/rsl_rl
-   -  `cd rsl_rl && pip install -e .` 
+   - Clone this repository
+   -  `cd Guardians_as_You_Fall/rsl_rl && pip install -e .` 
 5. Install legged_gym
-    - Clone this repository
-   - `cd legged_gym && pip install -e .`
+   - `cd .. && pip install -e .`
 
 ### Code Structure ###
 1. Each environment is defined by an env file (`*env_name*.py`) and a config file (`*env_name*_config.py`). The config file contains two classes: one conatianing all the environment parameters (`*env_name*Cfg`) and one for the training parameters (`*env_name*CfgPPo`).  
