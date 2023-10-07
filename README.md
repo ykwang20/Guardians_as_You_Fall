@@ -20,7 +20,7 @@ This repository is based on legged_gym https://leggedrobotics.github.io/legged_g
    - Clone this repository
    -  `cd Guardians_as_You_Fall/rsl_rl && pip install -e .` 
 5. Install legged_gym
-   - `cd .. && pip install -e .`
+   - `cd ../ && pip install -e .`
 
 ### Code Structure ###
 1. Each environment is defined by an env file (`*env_name*.py`) and a config file (`*env_name*_config.py`). The config file contains two classes: one conatianing all the environment parameters (`*env_name*Cfg`) and one for the training parameters (`*env_name*CfgPPo`).  
