@@ -17,7 +17,7 @@ This repository is based on legged_gym https://leggedrobotics.github.io/legged_g
    - Try running an example `cd examples && python 1080_balls_of_solitude.py`
    - For troubleshooting check docs `isaacgym/docs/index.html`)
 4. Install rsl_rl (PPO implementation)
-   - Clone this repository
+   - Clone this repository.
    -  `cd Guardians_as_You_Fall/rsl_rl && pip install -e .` 
 5. Install legged_gym
    - `cd ../ && pip install -e .`
