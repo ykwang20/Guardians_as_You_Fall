@@ -86,13 +86,8 @@ class PPO:
             self.offset_action=torch.zeros(1, env.num_obs, dtype=torch.float, device=self.device)
             self.offset_action[:,-40:-28]+=((env.front_dof-env.avg_dof)).unsqueeze(0)
             
-            self.front_stand_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/for_stand/exported/policies/stand_kp20_8_21.pt').to(self.device)
-            self.back_stand_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_stand/exported/policies/back_stand_policy_from_Aug06_01-53.pt').to(self.device)
-            self.fall_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/go1_fall_back/exported/policies/fall_policy.pt').to(self.device)
-            self.back_front_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/back_to_forward/exported/policies/back_for_policy.pt').to(self.device)
-            self.front_back_policy=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/forward_to_back/exported/policies/for_back_policy.pt').to(self.device)
-            self.estimator=torch.jit.load('/home/yikai/Fall_Recovery_control/logs/estimator/exported/policies/estimator_triple.pt').to(self.device)
-
+            self.front_stand_policy=torch.jit.load('../../logs/for_stand/exported/policies/stand_kp20_8_21.pt').to(self.device)
+            
     def init_storage(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape):
         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape, self.device)
         self.num_envs= num_envs 
@@ -123,11 +118,7 @@ class PPO:
         # Compute the actions and values
         env_ids=(mode.squeeze()==2).nonzero(as_tuple=False).flatten()
         actions=torch.where(mode==0, self.front_stand_policy(obs[:,-3*self.env.num_obs:]),self.zero_action)
-        actions+=torch.where(mode==1, self.back_stand_policy(obs[:,-3*self.env.num_obs:]),self.zero_action)
-        #actions[env_ids]=self.actor_critic.act(obs[env_ids,-self.env.num_obs:]+self.offset_action)
         actions+=torch.where(mode==2, self.actor_critic.act(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
-        actions+=torch.where(mode==3, self.back_front_policy(obs[:,-self.env.num_obs:]),self.zero_action)
-        actions+=torch.where(mode==4, self.front_back_policy(obs[:,-self.env.num_obs:]+self.offset_action),self.zero_action)
         
         
         
