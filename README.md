@@ -141,7 +141,7 @@ Then enter the docker by `cd ./go1_gym_deploy/docker && sudo make run` .
 
 ### Deploy a Custom Model
 1. `cd unitree_legged_sdk`
-2. Export a TorchScript model of your custom model. This could be accomplished in https://github.com/ykwang20/Guardians_as_You_Fall/legged_gym/scripts/play.py by setting `EXPORT_POLICY = True`.
+2. Export a TorchScript model of your custom model. This could be accomplished in https://github.com/ykwang20/Guardians_as_You_Fall/blob/minimal/legged_gym/scripts/play.py by setting `EXPORT_POLICY = True`.
 3. Write your control source code `source.cpp` to receive sensor data （filter the data if needed), inference, and perform action. 
 4. Edit the `CMakeLists.txt`:
 ```
