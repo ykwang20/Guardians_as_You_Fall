@@ -118,7 +118,7 @@ The base environment `legged_robot` implements a rough terrain locomotion task. 
 The main tools being used are libtorch(C++ version of Pytorch) and other dependencies listed in https://github.com/unitreerobotics/unitree_legged_sdk. Ideally, the required environment is pre-installed. Check the version of pre-installed Pytorch. If the version is >=1.8.0, skip to **Deploy a Custom Model**. Otherwise, you need to manully install Libtorch on the mini PC. There are several choices:
 1. Download the source code of Libtorch to the mini PC and compile onboard. *Downloading the official pre-built version is not feasible because all mini PCs are based on the ARM architecture*.
 2. Download the pre-built PyTorch pip wheel installers for Jetson.https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-11-now-available/72048
-3. Build a docker image containing the required libtorch and other dependencies, and install the docker on the mini PC. Could use the docker provided by https://github.com/Improbable-AI/walk-these-ways.git directly. Then mount the `~/unitree/unitree_legged_sdk/` directory into the docker by moving the directory inside `~/unitree/go1_gym/` and editting the `~/unitree/go1_gym/go1_gym_deploy/docker/Makefile` as follows:
+3. Build a docker image containing the required libtorch and other dependencies, and install the docker on the mini PC. You may use the docker provided by https://github.com/Improbable-AI/walk-these-ways.git. Then mount the `~/unitree/unitree_legged_sdk/` directory into the docker by moving the directory inside `~/unitree/go1_gym/` and editting the `~/unitree/go1_gym/go1_gym_deploy/docker/Makefile` as follows:
 ```
 run:
 	docker stop foxy_controller || true
@@ -141,7 +141,7 @@ Then enter the docker by `cd ./go1_gym_deploy/docker && sudo make run` .
 
 ### Deploy a Custom Model
 1. `cd unitree_legged_sdk`
-2. Export a TorchScript model of your custom model. This could be accomplished in https://github.com/wangyiji20/Fall_Recovery_control/blob/minimal/legged_gym/scripts/play.py by setting `EXPORT_POLICY = True`.
+2. Export a TorchScript model of your custom model. This could be accomplished in https://github.com/ykwang20/Guardians_as_You_Fall/legged_gym/scripts/play.py by setting `EXPORT_POLICY = True`.
 3. Write your control source code `source.cpp` to receive sensor data （filter the data if needed), inference, and perform action. 
 4. Edit the `CMakeLists.txt`:
 ```
