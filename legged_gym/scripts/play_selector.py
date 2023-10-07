@@ -144,8 +144,6 @@ def play(args):
             low_actions=torch.where(mode==0, ppo_runner.front_stand_policy(obs[:,-3*env.num_obs:]+ppo_runner.front_offset),ppo_runner.zero_action)
             low_actions+=torch.where(mode==2, ppo_runner.back_stand_policy(obs[:,-3*env.num_obs:]+ppo_runner.front_offset),ppo_runner.zero_action)
             low_actions+=torch.where(mode==1, ppo_runner.fall_policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
-            low_actions+=torch.where(mode==3, ppo_runner.back_front_policy(obs[:,-env.num_obs:]),ppo_runner.zero_action)
-            low_actions+=torch.where(mode==4, ppo_runner.front_back_policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
             
             obs, privileged_obs, rewards, dones, infos, _=env.step(low_actions,mode.squeeze(1),height)
         
