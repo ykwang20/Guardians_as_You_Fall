@@ -169,11 +169,7 @@ def play(args):
             #     env.damping_mode=True
             print('mode:',env.mode[robot_index])
             low_actions=torch.where(env.mode==0, ppo_runner.front_stand_policy(obs[:,-3*env.num_obs:]),ppo_runner.zero_action)
-            low_actions+=torch.where(env.mode==1, ppo_runner.back_stand_policy(obs[:,-3*env.num_obs:]),ppo_runner.zero_action)
             low_actions+=torch.where(env.mode==2, policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
-            low_actions+=torch.where(env.mode==3, ppo_runner.back_front_policy(obs[:,-env.num_obs:]),ppo_runner.zero_action)
-            low_actions+=torch.where(env.mode==4, ppo_runner.front_back_policy(obs[:,-env.num_obs:]+ppo_runner.offset_action),ppo_runner.zero_action)
-            #low_actions+=torch.where(env.mode==-1, policy(obs),ppo_runner.zero_action)
             actions_none=torch.zeros_like(low_actions)
             #print('low_actions',low_actions[0])
             
