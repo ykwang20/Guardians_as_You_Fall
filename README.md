@@ -39,8 +39,8 @@ This repository is based on legged_gym https://leggedrobotics.github.io/legged_g
 
 
 1. Working policy: the standing policy, trained with `go1_stand.py`.
-2. Transition controller: the policy for falling control, trained with `curr.py`, which provides mixed terrains, mixed tasks and training curriculum.
-3. recovery controller, the policy for convert the quadrupedal from reversed mode to regular mode, trained with `go1_fall.py`.
+2. Transition controller: the policy for falling control, trained with `curr.py` or `go1_fall_dr.py`. `curr.py` provides mixed terrains, mixed tasks and training curriculum (optional). `go1_fall_dr.py` provides extra domain randomization for sim-to-real transfer.
+3. recovery controller, the policy for convert the quadrupedal from reversed mode to regular mode, trained with `go1_recover.py`.
 4. Planner: trained with `selector.py`, which is trained to select the appropriate low-level policy. Trained from demonstration.
 
 The rl algorithm of each environment is defined in the corresponding `_config.py` files.

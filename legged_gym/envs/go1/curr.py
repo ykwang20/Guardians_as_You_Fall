@@ -249,8 +249,6 @@ class Go1Curr(BaseTask):
         #ball_contact=torch.logical_and(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1,self.pushed_buf)
         ball_contact=torch.logical_and(torch.norm(self.rigid_acc[:,0,:], dim=-1) > 10.7,self.pushed_buf)
         #ball_contact=torch.logical_and(self.root_states[:,2] <0.4,self.pushed_buf)
-        print('acc:',torch.norm(self.rigid_acc[0,0,:], dim=-1))
-        #print('contact, striked, ball_contact:',(torch.norm(self.ball_contact_forces[:, 0, :], dim=-1) > 1)[0],self.striked_buf[0],ball_contact[0])
         contact_ids=ball_contact.nonzero(as_tuple=False).flatten()
         
         self.mode[contact_ids]=2
@@ -358,22 +356,10 @@ class Go1Curr(BaseTask):
         self.privileged_obs_buf = torch.cat((  self.base_lin_vel * self.obs_scales.lin_vel,
                                     self.base_ang_vel  * self.obs_scales.ang_vel,
                                     self.projected_gravity,
-                                    #rpy*2,
-                                    #self.commands[:, :3] * self.commands_scale,
-                                    #self.goal_heading,
-                                    #self.root_states[:,:2]-self.env_origins[:,:2],
                                     (self.dof_pos - self.front_dof.unsqueeze(0)) * self.obs_scales.dof_pos,
                                     self.dof_vel * self.obs_scales.dof_vel,
-                                    self.actions-self.default_dof_stack[self.mode.squeeze(1)]
-,
+                                    self.actions-self.default_dof_stack[self.mode.squeeze(1)],
                                     self.contact_filt
-                                    #self.manip_commands[:,:3],
-                                    #(self.manip_commands[:,3]-self.manip_init_p[:,0]).unsqueeze(1),
-                                    #(self.manip_commands[:,4]-self.manip_init_p[:,1]).unsqueeze(1),
-                                    #(self.rigid_pos[:,self.feet_indices[0],0]-self.root_states[:,0]).unsqueeze(1),
-                                    #(self.rigid_pos[:,self.feet_indices[0],1]-self.root_states[:,1]).unsqueeze(1),
-                                    #self.rigid_pos[:,self.feet_indices[0],2].unsqueeze(1),
-                                    #(self.manip_commands[:,1]*torch.sin(math.pi*self.manip_commands[:,2])).unsqueeze(1)
                                     ),dim=-1)
         #print(self.privileged_obs_buf.shape,"pri")
         # add perceptive inputs if not blind

@@ -32,10 +32,10 @@ from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
 from .base.legged_robot import LeggedRobot
 from .go1.go1_stand import Go1Stand
 from .go1.go1_stand_config import Go1StandCfg, Go1StandCfgPPO
-from .go1.go1_fall import Go1Fall
-from .go1.go1_fall_config import Go1FallCfg, Go1FallCfgPPO
-from .go1.go1_fall_back import Go1FallBack
-from .go1.go1_fall_back_config import Go1FallBackCfg, Go1FallBackCfgPPO
+from .go1.go1_recover import Go1Recover
+from .go1.go1_recover_config import Go1RecoverCfg, Go1RecoverCfgPPO
+from .go1.go1_fall_dr import Go1FallDr
+from .go1.go1_fall_dr_config import Go1FallDrCfg, Go1FallDrCfgPPO
 from .go1.selector import Go1Selector
 from .go1.selector_config import SelectorCfg, SelectorCfgPPO
 from .go1.ball import Go1Ball
@@ -49,8 +49,8 @@ import os
 from legged_gym.utils.task_registry import task_registry
 
 task_registry.register( "go1_stand", Go1Stand, Go1StandCfg(), Go1StandCfgPPO() )
-task_registry.register( "go1_fall", Go1Fall, Go1FallCfg(), Go1FallCfgPPO() )
-task_registry.register( "back", Go1FallBack, Go1FallBackCfg(), Go1FallBackCfgPPO() )
+task_registry.register( "go1_recover", Go1Recover, Go1RecoverCfg(), Go1RecoverCfgPPO() )
+task_registry.register( "dr", Go1FallDr, Go1FallDrCfg(), Go1FallDrCfgPPO() )
 task_registry.register( "selector", Go1Selector, SelectorCfg(), SelectorCfgPPO() )
 task_registry.register( "ball", Go1Ball, BallCfg(), BallCfgPPO() )
 task_registry.register( "curr", Go1Curr, CurrCfg(), CurrCfgPPO() )

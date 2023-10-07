@@ -31,7 +31,7 @@
 
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
-class Go1FallBackCfg( LeggedRobotCfg ):
+class Go1FallDrCfg( LeggedRobotCfg ):
 
     class env( LeggedRobotCfg.env ):
         num_envs = 5480
@@ -237,7 +237,7 @@ class Go1FallBackCfg( LeggedRobotCfg ):
             
         only_positive_rewards = False#True # if true negative total rewards are clipped at zero (avoids early termination problems)
 
-class Go1FallBackCfgPPO( LeggedRobotCfgPPO ):
+class Go1FallDrCfgPPO( LeggedRobotCfgPPO ):
     seed=233
     class policy( LeggedRobotCfgPPO.policy ):
         init_noise_std = 1.0
