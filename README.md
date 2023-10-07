@@ -1,10 +1,10 @@
-# GYF: Active Mode Transition for Safe Falling #
-Code for training and onboard deployment.
+# Guardians as You Fall: Active Mode Transition for Safe Falling #
+Code for training and onboard deployment of "[Guardians as You Fall: Active Mode Transition for Safe Falling](https://sites.google.com/view/guardians-as-you-fall/)".
 ********
 
 ### Code Base 
 
-This repository is based on legged_gym https://leggedrobotics.github.io/legged_gym/.  
+This repository is based on legged_gym https://leggedrobotics.github.io/legged_gym/ and https://github.com/Alescontrela/AMP_for_hardware.git.  
 
 
 ### Installation ###
