@@ -1,5 +1,7 @@
 # Guardians as You Fall: Active Mode Transition for Safe Falling #
 Code for training and onboard deployment of "[Guardians as You Fall: Active Mode Transition for Safe Falling](https://sites.google.com/view/guardians-as-you-fall/)".
+![2023icra](https://github.com/ykwang20/Fall_Recovery_control/assets/75070200/2545ecb5-acea-4599-8d90-90ab6076383e)
+
 ********
 
 ### Code Base 
