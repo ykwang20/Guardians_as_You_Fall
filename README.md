@@ -185,3 +185,14 @@ make
 6. Switch the robot to damping mode using remote controller. The command sequence is : `L2+A`, `L2+B`, `L1+L2+START`.
 6. Run the controller: `cd build && sudo ./executable_name`
 
+### Citation
+```
+@misc{wang2023guardians,
+      title={Guardians as You Fall: Active Mode Transition for Safe Falling}, 
+      author={Yikai Wang and Mengdi Xu and Guanya Shi and Ding Zhao},
+      year={2023},
+      eprint={2310.04828},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO}
+}
+```
